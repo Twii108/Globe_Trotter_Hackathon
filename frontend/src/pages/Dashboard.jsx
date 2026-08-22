@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Plus, 
   MapPin, 
@@ -20,6 +21,7 @@ import { tripService, authService } from '../services/api';
 import '../styles/dashboard.css';
 
 export default function Dashboard({ user, onLogout }) {
+  const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(user || null);
   const [trips, setTrips] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
@@ -83,9 +85,10 @@ export default function Dashboard({ user, onLogout }) {
       const updatedBudget = await tripService.getBudgetSummary();
       setBudget(updatedBudget);
 
-      // Reset modal
+      // Reset modal and navigate to builder
       setNewTripData({ destination: '', country: '', startDate: '', endDate: '', budget: '', tags: '' });
       setIsModalOpen(false);
+      navigate(`/trips/${created.id}/builder`);
     } catch (err) {
       alert('Failed to create trip. Please try again.');
     } finally {
@@ -129,7 +132,7 @@ export default function Dashboard({ user, onLogout }) {
                   variant="secondary"
                   size="md"
                   icon={<Plus size={18} />}
-                  onClick={() => setIsModalOpen(true)}
+                  onClick={() => navigate('/trips/create')}
                 >
                   Plan New Trip
                 </Button>
@@ -160,7 +163,7 @@ export default function Dashboard({ user, onLogout }) {
                     variant="primary"
                     size="sm"
                     icon={<Plus size={16} />}
-                    onClick={() => setIsModalOpen(true)}
+                    onClick={() => navigate('/trips/create')}
                   >
                     New Trip
                   </Button>
@@ -177,13 +180,13 @@ export default function Dashboard({ user, onLogout }) {
                         key={trip.id}
                         image={trip.coverImage}
                         badge={trip.status}
-                        title={trip.destination}
+                        title={trip.name || trip.destination}
                         footer={
                           <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>
                               Budget: ${trip.budget}
                             </span>
-                            <Button variant="text" size="sm">
+                            <Button variant="text" size="sm" onClick={() => navigate(`/trips/${trip.id}`)}>
                               View Details
                             </Button>
                           </div>

@@ -41,22 +41,22 @@ export default function Navbar({ user, onLogout }) {
                   </Link>
                 </li>
                 <li>
-                  <a href="#upcoming-trips" className="navbar-link">
+                  <Link
+                    to="/trips"
+                    className={`navbar-link ${isActive('/trips') ? 'active' : ''}`}
+                  >
                     <Compass size={18} />
                     <span>My Trips</span>
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a href="#recommendations" className="navbar-link">
+                  <Link
+                    to="/trips/create"
+                    className={`navbar-link ${isActive('/trips/create') ? 'active' : ''}`}
+                  >
                     <ExploreIcon size={18} />
-                    <span>Explore</span>
-                  </a>
-                </li>
-                <li>
-                  <a href="#budget" className="navbar-link">
-                    <DollarSign size={18} />
-                    <span>Budget</span>
-                  </a>
+                    <span>Create Trip</span>
+                  </Link>
                 </li>
               </ul>
             </nav>

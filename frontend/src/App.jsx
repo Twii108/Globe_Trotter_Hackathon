@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
+import CreateTrip from './pages/CreateTrip';
+import MyTrips from './pages/MyTrips';
+import ItineraryBuilder from './pages/ItineraryBuilder';
+import ItineraryView from './pages/ItineraryView';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
@@ -60,6 +64,54 @@ export default function App() {
         }
       />
 
+      {/* My Trips Route */}
+      <Route
+        path="/trips"
+        element={
+          currentUser ? (
+            <MyTrips user={currentUser} onLogout={handleLogout} />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+
+      {/* Create Trip Route */}
+      <Route
+        path="/trips/create"
+        element={
+          currentUser ? (
+            <CreateTrip user={currentUser} onLogout={handleLogout} />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+
+      {/* Itinerary Builder Route */}
+      <Route
+        path="/trips/:id/builder"
+        element={
+          currentUser ? (
+            <ItineraryBuilder user={currentUser} onLogout={handleLogout} />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+
+      {/* Itinerary View Route */}
+      <Route
+        path="/trips/:id"
+        element={
+          currentUser ? (
+            <ItineraryView user={currentUser} onLogout={handleLogout} />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+
       {/* Fallback Catch-all Route */}
       <Route
         path="*"
@@ -68,3 +120,4 @@ export default function App() {
     </Routes>
   );
 }
+

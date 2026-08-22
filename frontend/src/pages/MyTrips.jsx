@@ -1,24 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { Plus, Compass, Search, Filter, FolderX, RefreshCw, AlertTriangle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import TripCard from '../components/TripCard';
 import Button from '../components/Button';
-import Modal from '../components/Modal';
-import { getTrips, deleteTrip, tripService } from '../services/api';
+import Input from '../components/Input';
+import { Search, Plus, Compass, Calendar, DollarSign, Eye, Edit, Trash2, Copy, Filter, ArrowUpDown } from 'lucide-react';
+import { getTrips, deleteTrip, duplicateTrip } from '../services/api';
 import '../styles/dashboard.css';
 
-export default function MyTrips({ user, onLogout }) {
+export default function MyTrips() {
   const navigate = useNavigate();
-
   const [trips, setTrips] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL');
 
-  // Delete modal state
-  const [deleteTargetId, setDeleteTargetId] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false);
+  // Filters & Sorting
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [sortBy, setSortBy] = useState('newest'); // 'newest' | 'date' | 'budget_high' | 'budget_low'
 
   useEffect(() => {
     loadTrips();
@@ -30,182 +27,189 @@ export default function MyTrips({ user, onLogout }) {
       const data = await getTrips();
       setTrips(data);
     } catch (err) {
-      console.error('Failed to load trips:', err);
+      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteConfirm = async () => {
-    if (!deleteTargetId) return;
-    setIsDeleting(true);
-    try {
-      await deleteTrip(deleteTargetId);
-      setTrips(prev => prev.filter(t => String(t.id) !== String(deleteTargetId)));
-      setDeleteTargetId(null);
-    } catch (err) {
-      alert('Failed to delete trip.');
-    } finally {
-      setIsDeleting(false);
+  const handleDelete = async (id, e) => {
+    e.stopPropagation();
+    if (window.confirm('Are you sure you want to delete this trip?')) {
+      await deleteTrip(id);
+      setTrips(trips.filter(t => String(t.id) !== String(id)));
     }
   };
 
-  const filteredTrips = trips.filter(trip => {
-    const tripName = (trip.name || trip.destination || '').toLowerCase();
-    const country = (trip.country || '').toLowerCase();
-    const query = searchQuery.toLowerCase();
-    const matchesSearch = tripName.includes(query) || country.includes(query);
+  const handleDuplicate = async (id, e) => {
+    e.stopPropagation();
+    const cloned = await duplicateTrip(id);
+    setTrips([cloned, ...trips]);
+  };
 
-    if (statusFilter === 'ALL') return matchesSearch;
-    return matchesSearch && (trip.status || '').toUpperCase() === statusFilter.toUpperCase();
+  // Filter & Sort Logic
+  const filteredTrips = trips.filter(t => {
+    const matchesSearch = searchQuery === '' ||
+      t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.destination.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.country.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesStatus = statusFilter === 'All' || t.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  }).sort((a, b) => {
+    if (sortBy === 'date') return new Date(a.startDate) - new Date(b.startDate);
+    if (sortBy === 'budget_high') return b.budget - a.budget;
+    if (sortBy === 'budget_low') return a.budget - b.budget;
+    return new Date(b.createdAt || 0) - new Date(a.createdAt || 0); // newest default
   });
 
   return (
-    <div className="dashboard-page">
-      <Navbar user={user} onLogout={onLogout} />
+    <div className="dashboard-layout">
+      <Navbar activeTab="my-trips" />
 
-      <main className="dashboard-content" style={{ padding: '2rem 0 4rem 0' }}>
-        <div className="container">
-          {/* Header & Action Bar */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '2rem' }}>
-            <div>
-              <h1 style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <Compass size={30} color="var(--primary)" />
-                My Trips
-              </h1>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', marginTop: '0.2rem' }}>
-                Manage all your upcoming and past itineraries in one place.
-              </p>
-            </div>
-
-            <Button
-              variant="primary"
-              size="md"
-              icon={<Plus size={18} />}
-              onClick={() => navigate('/trips/create')}
-            >
-              Create New Trip
-            </Button>
+      <main className="dashboard-content">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <div>
+            <h1 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-main)' }}>
+              My Trips & Itineraries
+            </h1>
+            <p style={{ margin: '0.25rem 0 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+              Manage, search, sort, and duplicate all your travel itineraries in one place.
+            </p>
           </div>
 
-          {/* Search & Filter controls */}
-          <div
-            style={{
-              display: 'flex',
-              gap: '1rem',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              marginBottom: '1.75rem',
-              padding: '1rem 1.25rem',
-              backgroundColor: 'var(--surface)',
-              borderRadius: 'var(--radius-lg)',
-              border: '1px solid var(--border)'
-            }}
+          <Button
+            variant="primary"
+            icon={<Plus size={18} />}
+            onClick={() => navigate('/trips/create')}
           >
-            <div style={{ position: 'relative', flex: 1, minWidth: '240px' }}>
-              <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input
-                type="text"
-                placeholder="Search trip name, destination, or country..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="input-field"
-                style={{ paddingLeft: '2.5rem' }}
-              />
-            </div>
+            Create New Trip
+          </Button>
+        </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Filter size={16} style={{ color: 'var(--text-muted)' }} />
-              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>Status:</span>
+        {/* Filter & Search Toolbar */}
+        <div style={{ backgroundColor: 'var(--surface)', padding: '1rem 1.25rem', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', boxShadow: 'var(--shadow-sm)' }}>
+          <div style={{ flex: '1 1 300px', minWidth: '260px' }}>
+            <Input
+              icon={<Search size={18} />}
+              placeholder="Search trips by name, destination, country..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+              <Filter size={16} /> Status:
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="input-field"
-                style={{ width: 'auto', padding: '0.5rem 1rem', fontSize: '0.85rem' }}
+                style={{ padding: '6px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', backgroundColor: 'var(--surface)', fontWeight: 600, fontSize: '0.85rem' }}
               >
-                <option value="ALL">All Statuses</option>
-                <option value="UPCOMING">Upcoming</option>
-                <option value="PLANNING">Planning</option>
-                <option value="COMPLETED">Completed</option>
+                <option value="All">All Statuses</option>
+                <option value="Planning">Planning</option>
+                <option value="Upcoming">Upcoming</option>
+                <option value="Ongoing">Ongoing</option>
+                <option value="Completed">Completed</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+              <ArrowUpDown size={16} /> Sort:
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                style={{ padding: '6px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', backgroundColor: 'var(--surface)', fontWeight: 600, fontSize: '0.85rem' }}
+              >
+                <option value="newest">Newest First</option>
+                <option value="date">Start Date</option>
+                <option value="budget_high">Highest Budget</option>
+                <option value="budget_low">Lowest Budget</option>
               </select>
             </div>
           </div>
+        </div>
 
-          {/* Trips Grid */}
-          {loading ? (
-            <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-              Loading your trips...
-            </div>
-          ) : filteredTrips.length > 0 ? (
-            <div className="trips-grid">
-              {filteredTrips.map(trip => (
-                <TripCard
+        {/* Trip Grid */}
+        {loading ? (
+          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+            Loading your trips...
+          </div>
+        ) : filteredTrips.length > 0 ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
+            {filteredTrips.map((trip) => {
+              const cityCount = trip.stops ? trip.stops.length : 0;
+              const actCount = (trip.stops || []).reduce((sum, s) => sum + (s.activities ? s.activities.length : 0), 0);
+
+              return (
+                <div
                   key={trip.id}
-                  trip={trip}
-                  onDelete={(id) => setDeleteTargetId(id)}
-                />
-              ))}
-            </div>
-          ) : (
-            /* Empty State */
-            <div className="empty-state">
-              <div className="empty-state-icon">
-                <FolderX size={32} />
-              </div>
-              <h3 className="empty-state-title">No Trips Found</h3>
-              <p className="empty-state-text">
-                {searchQuery || statusFilter !== 'ALL'
-                  ? 'No trips match your current search or status filter.'
-                  : 'You have not created any trips yet. Click below to start planning!'}
-              </p>
-              <Button
-                variant="primary"
-                icon={<Plus size={18} />}
-                onClick={() => navigate('/trips/create')}
-              >
-                Create Your First Trip
-              </Button>
-            </div>
-          )}
-        </div>
-      </main>
+                  onClick={() => navigate(`/trips/${trip.id}`)}
+                  style={{
+                    backgroundColor: 'var(--surface)',
+                    borderRadius: 'var(--radius-xl)',
+                    border: '1px solid var(--border)',
+                    overflow: 'hidden',
+                    boxShadow: 'var(--shadow-sm)',
+                    cursor: 'pointer',
+                    transition: 'transform 0.2s, box-shadow 0.2s'
+                  }}
+                >
+                  <div style={{ height: '160px', width: '100%', position: 'relative', overflow: 'hidden' }}>
+                    <img
+                      src={trip.coverImage || 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=800&q=80'}
+                      alt={trip.name}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                    <span style={{ position: 'absolute', top: '12px', right: '12px', padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 800, backgroundColor: 'rgba(255,255,255,0.95)', color: 'var(--text-main)', boxShadow: 'var(--shadow-sm)' }}>
+                      {trip.status}
+                    </span>
+                  </div>
 
-      {/* Delete Confirmation Modal */}
-      <Modal
-        isOpen={Boolean(deleteTargetId)}
-        onClose={() => setDeleteTargetId(null)}
-        title="Confirm Delete Trip"
-        maxWidth="440px"
-      >
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-          <div style={{ padding: '0.5rem', background: '#FEE2E2', borderRadius: '50%', color: 'var(--danger)' }}>
-            <AlertTriangle size={24} />
+                  <div style={{ padding: '1.25rem' }}>
+                    <h3 style={{ margin: '0 0 0.4rem', fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                      {trip.name}
+                    </h3>
+                    <div style={{ fontSize: '0.825rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.75rem' }}>
+                      <Calendar size={14} /> {trip.startDate} ➔ {trip.endDate}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '1rem', fontSize: '0.85rem', color: 'var(--text-main)', padding: '0.6rem 0', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', marginBottom: '1rem' }}>
+                      <span>📍 <strong>{cityCount}</strong> Cities</span>
+                      <span>🎯 <strong>{actCount}</strong> Activities</span>
+                      <span>💵 <strong>${trip.budget}</strong></span>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Button variant="primary" size="sm" icon={<Eye size={14} />} onClick={(e) => { e.stopPropagation(); navigate(`/trips/${trip.id}`); }}>
+                        View
+                      </Button>
+
+                      <div style={{ display: 'flex', gap: '0.4rem' }}>
+                        <button onClick={(e) => handleDuplicate(trip.id, e)} title="Duplicate Trip" style={{ background: 'var(--neutral-bg)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px', cursor: 'pointer' }}>
+                          <Copy size={15} />
+                        </button>
+                        <button onClick={(e) => handleDelete(trip.id, e)} title="Delete Trip" style={{ background: 'var(--neutral-bg)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px', color: 'var(--danger)', cursor: 'pointer' }}>
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          <div>
-            <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-main)', fontSize: '1rem' }}>Delete this trip itinerary?</h4>
-            <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-              Are you sure you want to delete this trip? This action cannot be undone and will delete all associated stops and activities.
+        ) : (
+          <div style={{ padding: '4rem 2rem', textAlign: 'center', backgroundColor: 'var(--surface)', borderRadius: 'var(--radius-xl)', border: '1px dashed var(--border)' }}>
+            <Compass size={44} color="var(--primary)" style={{ opacity: 0.4, marginBottom: '0.75rem' }} />
+            <h3 style={{ margin: '0 0 0.5rem', color: 'var(--text-main)' }}>No trips found</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
+              No travel itineraries match your current search query or filter criteria.
             </p>
+            <Button variant="primary" onClick={() => { setSearchQuery(''); setStatusFilter('All'); }}>Reset Filters</Button>
           </div>
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
-          <Button
-            variant="outline"
-            onClick={() => setDeleteTargetId(null)}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            style={{ backgroundColor: 'var(--danger)', borderColor: 'var(--danger)' }}
-            loading={isDeleting}
-            onClick={handleDeleteConfirm}
-          >
-            Delete Trip
-          </Button>
-        </div>
-      </Modal>
+        )}
+      </main>
     </div>
   );
 }

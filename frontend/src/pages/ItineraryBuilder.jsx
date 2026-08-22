@@ -1,46 +1,59 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  Plus, 
-  MapPin, 
-  Calendar, 
-  Clock, 
-  DollarSign, 
-  Trash2, 
-  ArrowUp, 
-  ArrowDown, 
-  CheckCircle, 
-  Eye,
-  Building2,
-  Sparkles
-} from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Button from '../components/Button';
 import Input from '../components/Input';
 import Modal from '../components/Modal';
-import { getTrip, addStop, addActivity, removeActivity, deleteStop, reorderStops, updateTrip } from '../services/api';
+import TransportManager from '../components/TransportManager';
+import TripCalendarView from '../components/TripCalendarView';
+import {
+  getTrip,
+  addStop,
+  deleteStop,
+  reorderStops,
+  addActivity,
+  removeActivity,
+  searchCities,
+  getActivities,
+  calculateTripBudget,
+  detectTripConflicts,
+  calculateTripHealthScore,
+  toggleShareStatus
+} from '../services/api';
+import {
+  MapPin, Plus, Trash2, Calendar, Clock, DollarSign, ArrowUp, ArrowDown,
+  AlertTriangle, ShieldCheck, Share2, Check, Copy, ExternalLink, Activity as ActivityIcon, Compass
+} from 'lucide-react';
 import '../styles/dashboard.css';
 
-export default function ItineraryBuilder({ user, onLogout }) {
+export default function ItineraryBuilder() {
   const { id } = useParams();
   const navigate = useNavigate();
 
   const [trip, setTrip] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [transportSegments, setTransportSegments] = useState([]);
 
-  // Add Stop Modal State
+  // Modals
   const [isAddStopOpen, setIsAddStopOpen] = useState(false);
-  const [newStopData, setNewStopData] = useState({ city: '', startDate: '', endDate: '' });
-  const [submittingStop, setSubmittingStop] = useState(false);
+  const [isAddActivityOpen, setIsAddActivityOpen] = useState(false);
+  const [activeStopForActivity, setActiveStopForActivity] = useState(null);
 
-  // Add Activity Modal State
-  const [addActivityStopId, setAddActivityStopId] = useState(null);
-  const [newActivityData, setNewActivityData] = useState({ name: '', time: '10:00 AM', cost: '20', dayNumber: '1', date: '' });
-  const [submittingActivity, setSubmittingActivity] = useState(false);
+  // Form States
+  const [stopForm, setStopForm] = useState({ city: '', cityId: null, startDate: '', endDate: '' });
+  const [activityForm, setActivityForm] = useState({ name: '', category: 'Sightseeing', date: '', time: '10:00 AM', cost: '30' });
+  const [availableCities, setAvailableCities] = useState([]);
+  const [availableActivities, setAvailableActivities] = useState([]);
+  const [stopError, setStopError] = useState('');
+  const [activityError, setActivityError] = useState('');
+
+  // Sharing
+  const [shareId, setShareId] = useState(null);
+  const [shareCopied, setShareCopied] = useState(false);
 
   useEffect(() => {
     loadTripData();
+    loadCatalogData();
   }, [id]);
 
   const loadTripData = async () => {
@@ -48,105 +61,166 @@ export default function ItineraryBuilder({ user, onLogout }) {
     try {
       const data = await getTrip(id);
       setTrip(data);
+      if (data.shareId) setShareId(data.shareId);
+
+      // Pre-fill default dates for stop form
+      if (data.startDate && data.endDate) {
+        setStopForm(prev => ({ ...prev, startDate: data.startDate, endDate: data.endDate }));
+      }
     } catch (err) {
-      console.error('Error loading trip for builder:', err);
+      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  // --- STOP ACTIONS ---
+  const loadCatalogData = async () => {
+    const cities = await searchCities('');
+    setAvailableCities(cities);
+    const acts = await getActivities({});
+    setAvailableActivities(acts);
+  };
+
+  // --- STOP MANAGEMENT ---
   const handleAddStopSubmit = async (e) => {
     e.preventDefault();
-    if (!newStopData.city.trim()) {
-      alert('Please enter a city name.');
+    setStopError('');
+
+    if (!stopForm.city.trim()) {
+      setStopError('City name is required.');
       return;
     }
 
-    setSubmittingStop(true);
+    // Stop Date Validation Rules (#5 in prompt)
+    if (stopForm.startDate && stopForm.endDate) {
+      if (stopForm.startDate < trip.startDate) {
+        setStopError(`Stop start date cannot be before trip start date (${trip.startDate}).`);
+        return;
+      }
+      if (stopForm.endDate > trip.endDate) {
+        setStopError(`Stop end date cannot be after trip end date (${trip.endDate}).`);
+        return;
+      }
+      if (stopForm.endDate < stopForm.startDate) {
+        setStopError('Stop end date cannot be earlier than start date.');
+        return;
+      }
+    }
+
     try {
       const res = await addStop(id, {
-        city: newStopData.city,
-        startDate: newStopData.startDate || trip.startDate,
-        endDate: newStopData.endDate || trip.endDate
+        city: stopForm.city.trim(),
+        cityId: stopForm.cityId,
+        startDate: stopForm.startDate,
+        endDate: stopForm.endDate,
+        position: trip.stops ? trip.stops.length : 0
       });
       setTrip(res.trip);
-      setNewStopData({ city: '', startDate: '', endDate: '' });
       setIsAddStopOpen(false);
+      setStopForm({ city: '', cityId: null, startDate: trip.startDate, endDate: trip.endDate });
     } catch (err) {
-      alert('Failed to add stop.');
-    } finally {
-      setSubmittingStop(false);
+      setStopError(err.message || 'Failed to add stop.');
     }
   };
 
   const handleDeleteStop = async (stopId) => {
-    if (!window.confirm('Remove this destination stop and its activities?')) return;
-    const updated = await deleteStop(id, stopId);
-    if (updated) setTrip(updated);
+    if (window.confirm('Delete this destination city stop and all its activities?')) {
+      const updated = await deleteStop(id, stopId);
+      setTrip(updated);
+    }
   };
 
-  const handleMoveStop = async (index, direction) => {
+  const handleMoveStop = async (stopIdx, direction) => {
     if (!trip || !trip.stops) return;
     const newStops = [...trip.stops];
-    const targetIndex = index + direction;
-    if (targetIndex < 0 || targetIndex >= newStops.length) return;
+    const targetIdx = direction === 'up' ? stopIdx - 1 : stopIdx + 1;
+    if (targetIdx < 0 || targetIdx >= newStops.length) return;
 
-    // Swap stops
-    const temp = newStops[index];
-    newStops[index] = newStops[targetIndex];
-    newStops[targetIndex] = temp;
+    const temp = newStops[stopIdx];
+    newStops[stopIdx] = newStops[targetIdx];
+    newStops[targetIdx] = temp;
 
-    setTrip({ ...trip, stops: newStops });
-    await reorderStops(id, newStops);
+    const updatedTrip = await reorderStops(id, newStops);
+    setTrip(updatedTrip);
   };
 
-  // --- ACTIVITY ACTIONS ---
+  // --- ACTIVITY MANAGEMENT ---
   const handleOpenAddActivity = (stop) => {
-    setAddActivityStopId(stop.id);
-    setNewActivityData({
+    setActiveStopForActivity(stop);
+    setActivityForm({
       name: '',
+      category: 'Sightseeing',
+      date: stop.startDate || trip.startDate,
       time: '10:00 AM',
-      cost: '25',
-      dayNumber: '1',
-      date: stop.startDate || trip.startDate
+      cost: '30'
     });
+    setActivityError('');
+    setIsAddActivityOpen(true);
   };
 
   const handleAddActivitySubmit = async (e) => {
     e.preventDefault();
-    if (!newActivityData.name.trim()) {
-      alert('Please enter an activity name.');
+    setActivityError('');
+
+    if (!activityForm.name.trim()) {
+      setActivityError('Activity name is required.');
+      return;
+    }
+    if (Number(activityForm.cost) < 0) {
+      setActivityError('Activity cost cannot be negative.');
       return;
     }
 
-    setSubmittingActivity(true);
+    // Activity Date Validation Rules (#6 in prompt)
+    if (activeStopForActivity) {
+      if (activityForm.date && activeStopForActivity.startDate && activityForm.date < activeStopForActivity.startDate) {
+        setActivityError(`Activity date must be within stop dates (${activeStopForActivity.startDate} ➔ ${activeStopForActivity.endDate}).`);
+        return;
+      }
+      if (activityForm.date && activeStopForActivity.endDate && activityForm.date > activeStopForActivity.endDate) {
+        setActivityError(`Activity date must be within stop dates (${activeStopForActivity.startDate} ➔ ${activeStopForActivity.endDate}).`);
+        return;
+      }
+    }
+
     try {
-      const res = await addActivity(id, addActivityStopId, {
-        name: newActivityData.name,
-        time: newActivityData.time,
-        cost: newActivityData.cost,
-        dayNumber: newActivityData.dayNumber,
-        date: newActivityData.date
+      const res = await addActivity(id, activeStopForActivity.id, {
+        name: activityForm.name.trim(),
+        category: activityForm.category,
+        date: activityForm.date,
+        time: activityForm.time,
+        cost: Number(activityForm.cost) || 0
       });
       setTrip(res.trip);
-      setAddActivityStopId(null);
+      setIsAddActivityOpen(false);
     } catch (err) {
-      alert('Failed to add activity.');
-    } finally {
-      setSubmittingActivity(false);
+      setActivityError(err.message || 'Failed to add activity.');
     }
   };
 
-  const handleRemoveActivity = async (stopId, activityId) => {
-    const updated = await removeActivity(id, stopId, activityId);
-    if (updated) setTrip(updated);
+  const handleRemoveActivity = async (stopId, actId) => {
+    const updated = await removeActivity(id, stopId, actId);
+    setTrip(updated);
   };
 
-  if (loading) {
+  // --- PUBLIC SHARING ---
+  const handleToggleShare = async () => {
+    const res = await toggleShareStatus(id, !trip.isPublic);
+    setTrip({ ...trip, isPublic: !trip.isPublic, shareId: res.shareId });
+    setShareId(res.shareId);
+  };
+
+  const handleCopyShareLink = () => {
+    const url = `${window.location.origin}/shared/${shareId || trip?.shareId || id}`;
+    navigator.clipboard.writeText(url);
+    setShareCopied(true);
+    setTimeout(() => setShareCopied(false), 2500);
+  };
+
+  if (loading || !trip) {
     return (
-      <div className="dashboard-page">
-        <Navbar user={user} onLogout={onLogout} />
+      <div className="dashboard-layout">
+        <Navbar activeTab="my-trips" />
         <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-muted)' }}>
           Loading Itinerary Builder...
         </div>
@@ -154,363 +228,368 @@ export default function ItineraryBuilder({ user, onLogout }) {
     );
   }
 
-  if (!trip) {
-    return (
-      <div className="dashboard-page">
-        <Navbar user={user} onLogout={onLogout} />
-        <div style={{ padding: '4rem', textAlign: 'center' }}>
-          <h2>Trip Not Found</h2>
-          <Button variant="primary" onClick={() => navigate('/trips')}>
-            Back to My Trips
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  const stops = trip.stops || [];
+  // Conflict, Health Score & Budget Calculations
+  const conflicts = detectTripConflicts(trip, transportSegments);
+  const healthInfo = calculateTripHealthScore(trip, transportSegments);
+  const budgetInfo = calculateTripBudget(trip, [], transportSegments);
 
   return (
-    <div className="dashboard-page">
-      <Navbar user={user} onLogout={onLogout} />
+    <div className="dashboard-layout">
+      <Navbar activeTab="my-trips" />
 
-      <main className="dashboard-content" style={{ padding: '2rem 0 4rem 0' }}>
-        <div className="container" style={{ maxWidth: '960px' }}>
-          {/* Top Actions Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-              <Button
-                variant="outline"
-                size="sm"
-                icon={<ArrowLeft size={16} />}
-                onClick={() => navigate('/trips')}
-              >
-                Back to My Trips
-              </Button>
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>/ Itinerary Builder</span>
+      <main className="dashboard-content" style={{ maxWidth: '1100px', margin: '0 auto' }}>
+        {/* Header Action Bar */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.2rem' }}>
+              <span style={{ padding: '3px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 800, backgroundColor: 'var(--primary-light)', color: 'var(--primary)' }}>
+                {trip.status}
+              </span>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                {trip.startDate} ➔ {trip.endDate} ({trip.durationDays} Days)
+              </span>
             </div>
+            <h1 style={{ margin: 0, fontSize: '1.85rem', fontWeight: 800, color: 'var(--text-main)' }}>
+              {trip.name}
+            </h1>
+          </div>
 
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
-              <Button
-                variant="secondary"
-                size="md"
-                icon={<Plus size={18} />}
-                onClick={() => setIsAddStopOpen(true)}
-              >
-                Add Stop
+          <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+            <Button variant="outline" size="sm" onClick={() => navigate(`/trips/${id}/budget`)}>
+              <DollarSign size={15} /> Budget (${budgetInfo.effectiveSpending})
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate(`/trips/${id}/timeline`)}>
+              <Clock size={15} /> Timeline
+            </Button>
+            <Button variant="secondary" size="sm" icon={<Share2 size={15} />} onClick={handleToggleShare}>
+              {trip.isPublic ? 'Sharing Enabled' : 'Enable Sharing'}
+            </Button>
+          </div>
+        </div>
+
+        {/* Public Sharing Link Card (If enabled) */}
+        {trip.isPublic && (
+          <div style={{ backgroundColor: 'rgba(37, 99, 235, 0.08)', border: '1px solid var(--primary)', padding: '1rem 1.25rem', borderRadius: 'var(--radius-lg)', marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+            <div>
+              <div style={{ fontWeight: 700, color: 'var(--primary)', fontSize: '0.95rem' }}>
+                🌐 Public Sharing Link Active
+              </div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                Anyone with this link can view a read-only copy of this trip itinerary.
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <Button variant="primary" size="sm" icon={shareCopied ? <Check size={14} /> : <Copy size={14} />} onClick={handleCopyShareLink}>
+                {shareCopied ? 'Link Copied!' : 'Copy Link'}
               </Button>
-              <Button
-                variant="primary"
-                size="md"
-                icon={<Eye size={18} />}
-                onClick={() => navigate(`/trips/${id}`)}
-              >
-                View Itinerary
+              <Button variant="outline" size="sm" icon={<ExternalLink size={14} />} onClick={() => window.open(`/shared/${shareId || trip.shareId}`, '_blank')}>
+                Open Public Page
               </Button>
             </div>
           </div>
+        )}
 
-          {/* Trip Banner Overview */}
-          <div
-            className="card"
-            style={{
-              padding: '1.5rem 2rem',
-              marginBottom: '2rem',
-              backgroundColor: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-lg)',
-              display: 'flex',
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: '1rem'
-            }}
-          >
+        {/* Conflict & Warning Banner (#22 in prompt) */}
+        {conflicts.length > 0 && (
+          <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.08)', border: '1px solid var(--danger)', padding: '1rem 1.25rem', borderRadius: 'var(--radius-lg)', marginBottom: '1.5rem' }}>
+            <div style={{ fontWeight: 800, color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.95rem', marginBottom: '0.4rem' }}>
+              <AlertTriangle size={18} /> Itinerary Warnings & Conflicts Detected ({conflicts.length})
+            </div>
+            <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.85rem', color: 'var(--text-main)', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+              {conflicts.map((conf, cIdx) => (
+                <li key={cIdx}>{conf}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Trip Health Score Card (#24 in prompt) */}
+        <div style={{ backgroundColor: 'var(--surface)', padding: '1.25rem', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', boxShadow: 'var(--shadow-sm)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: healthInfo.score >= 80 ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '1.25rem', color: healthInfo.score >= 80 ? '#10b981' : '#f59e0b' }}>
+              {healthInfo.score}
+            </div>
             <div>
-              <span style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--primary)', backgroundColor: 'var(--primary-light)', padding: '3px 10px', borderRadius: '12px' }}>
-                Itinerary Builder Mode
-              </span>
-              <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-main)', margin: '0.5rem 0 0.25rem 0' }}>
-                {trip.name || trip.destination}
-              </h1>
-              <div style={{ display: 'flex', gap: '1.25rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <Calendar size={15} /> {trip.startDate} to {trip.endDate} ({trip.durationDays} Days)
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                  <MapPin size={15} color="var(--primary)" /> {stops.length} Destination {stops.length === 1 ? 'Stop' : 'Stops'}
-                </span>
+              <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <ShieldCheck size={18} color="var(--primary)" /> TRIP HEALTH SCORE — {healthInfo.status}
+              </div>
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                Evaluates dates, stop completeness, activity travel gaps, and budget compliance.
               </div>
             </div>
           </div>
 
-          {/* STOPS LIST SECTION */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Building2 color="var(--primary)" size={22} />
-                Itinerary Destination Stops ({stops.length})
-              </h2>
+          {healthInfo.deductions.length > 0 && (
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', maxWidth: '400px' }}>
+              <strong>Deductions:</strong> {healthInfo.deductions.join(' ')}
             </div>
+          )}
+        </div>
 
-            {stops.length === 0 ? (
+        {/* Main Section Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <h2 style={{ margin: 0, fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <MapPin size={22} color="var(--primary)" /> Destination City Stops & Activities
+          </h2>
+          <Button variant="primary" icon={<Plus size={16} />} onClick={() => setIsAddStopOpen(true)}>
+            Add Destination Stop
+          </Button>
+        </div>
+
+        {/* VISUAL CITY HIERARCHY (#4 in prompt): CITY 1 ↓ activities ➔ CITY 2 ↓ activities */}
+        {trip.stops && trip.stops.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            {trip.stops.map((stop, stopIdx) => (
               <div
+                key={stop.id}
                 style={{
-                  padding: '3rem 2rem',
-                  textAlign: 'center',
                   backgroundColor: 'var(--surface)',
-                  border: '2px dashed var(--border)',
-                  borderRadius: 'var(--radius-lg)'
+                  borderRadius: 'var(--radius-xl)',
+                  border: '1px solid var(--border)',
+                  overflow: 'hidden',
+                  boxShadow: 'var(--shadow-sm)'
                 }}
               >
-                <MapPin size={40} color="var(--primary)" style={{ opacity: 0.6, marginBottom: '0.75rem' }} />
-                <h3 style={{ margin: '0 0 0.5rem 0', color: 'var(--text-main)' }}>No Destination Stops Added Yet</h3>
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
-                  Add your first city stop to begin structuring your day-by-day activities.
-                </p>
-                <Button
-                  variant="primary"
-                  icon={<Plus size={18} />}
-                  onClick={() => setIsAddStopOpen(true)}
-                >
-                  Add First Stop
-                </Button>
-              </div>
-            ) : (
-              stops.map((stop, index) => (
-                <div
-                  key={stop.id}
-                  className="card"
-                  style={{
-                    padding: '1.5rem',
-                    backgroundColor: 'var(--surface)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--radius-lg)',
-                    boxShadow: 'var(--shadow-sm)'
-                  }}
-                >
-                  {/* Stop Header Bar */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', borderBottom: '1px solid var(--border)', paddingBottom: '1rem', marginBottom: '1rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <div
-                        style={{
-                          width: '36px',
-                          height: '36px',
-                          borderRadius: '50%',
-                          backgroundColor: 'var(--primary)',
-                          color: '#fff',
-                          fontWeight: 700,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '1rem'
-                        }}
-                      >
-                        {index + 1}
+                {/* City Stop Header Bar */}
+                <div style={{ padding: '1rem 1.5rem', backgroundColor: 'var(--neutral-bg)', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <span style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: 'var(--primary)', color: '#fff', fontWeight: 800, fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {stopIdx + 1}
+                    </span>
+                    <div>
+                      <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                        {stop.city}
+                      </h3>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        Dates: {stop.startDate || 'TBD'} ➔ {stop.endDate || 'TBD'}
                       </div>
-                      <div>
-                        <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                          {stop.city}
-                        </h3>
-                        <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.35rem', marginTop: '2px' }}>
-                          <Calendar size={13} /> {stop.startDate} – {stop.endDate}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Reorder and Delete controls */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={index === 0}
-                        icon={<ArrowUp size={14} />}
-                        onClick={() => handleMoveStop(index, -1)}
-                        title="Move Stop Up"
-                      />
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={index === stops.length - 1}
-                        icon={<ArrowDown size={14} />}
-                        onClick={() => handleMoveStop(index, 1)}
-                        title="Move Stop Down"
-                      />
-                      <Button
-                        variant="text"
-                        size="sm"
-                        style={{ color: 'var(--danger)' }}
-                        icon={<Trash2 size={16} />}
-                        onClick={() => handleDeleteStop(stop.id)}
-                        title="Remove Stop"
-                      >
-                        Remove Stop
-                      </Button>
                     </div>
                   </div>
 
-                  {/* Activities under this stop */}
-                  <div style={{ marginBottom: '1rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                      <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)' }}>
-                        Planned Activities ({stop.activities ? stop.activities.length : 0})
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        icon={<Plus size={14} />}
-                        onClick={() => handleOpenAddActivity(stop)}
-                      >
-                        Add Activity
-                      </Button>
-                    </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <button
+                      onClick={() => handleMoveStop(stopIdx, 'up')}
+                      disabled={stopIdx === 0}
+                      style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', padding: '4px 8px', cursor: stopIdx === 0 ? 'not-allowed' : 'pointer', opacity: stopIdx === 0 ? 0.3 : 1 }}
+                      title="Move City Up"
+                    >
+                      <ArrowUp size={15} />
+                    </button>
+                    <button
+                      onClick={() => handleMoveStop(stopIdx, 'down')}
+                      disabled={stopIdx === trip.stops.length - 1}
+                      style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: '6px', padding: '4px 8px', cursor: stopIdx === trip.stops.length - 1 ? 'not-allowed' : 'pointer', opacity: stopIdx === trip.stops.length - 1 ? 0.3 : 1 }}
+                      title="Move City Down"
+                    >
+                      <ArrowDown size={15} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteStop(stop.id)}
+                      style={{ background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '4px 8px' }}
+                      title="Delete City Stop"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
 
-                    {stop.activities && stop.activities.length > 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                        {stop.activities.map((act) => (
-                          <div
-                            key={act.id}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              padding: '0.75rem 1rem',
-                              backgroundColor: 'var(--neutral-bg)',
-                              borderRadius: 'var(--radius-md)',
-                              border: '1px solid var(--border)'
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                              <CheckCircle size={16} color="var(--primary)" />
-                              <div>
-                                <span style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.95rem' }}>
-                                  {act.name}
-                                </span>
-                                <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                    <Clock size={12} /> {act.time}
-                                  </span>
-                                  {act.cost !== undefined && (
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--accent)', fontWeight: 600 }}>
-                                      <DollarSign size={12} /> Est. ${act.cost}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
+                {/* Activities inside City Stop */}
+                <div style={{ padding: '1.25rem 1.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+                      Scheduled Activities ({stop.activities ? stop.activities.length : 0})
+                    </span>
+                    <Button variant="outline" size="sm" icon={<Plus size={14} />} onClick={() => handleOpenAddActivity(stop)}>
+                      Add Activity
+                    </Button>
+                  </div>
+
+                  {stop.activities && stop.activities.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      {stop.activities.map((act) => (
+                        <div
+                          key={act.id}
+                          style={{
+                            display: 'flex',
+                            justify: 'space-between',
+                            alignItems: 'center',
+                            padding: '0.85rem 1rem',
+                            backgroundColor: 'var(--surface)',
+                            borderRadius: 'var(--radius-md)',
+                            border: '1px solid var(--border)'
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                            <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: 'var(--primary)' }}>
+                              <Clock size={16} />
                             </div>
 
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text-main)' }}>
+                                {act.name}
+                              </div>
+                              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', gap: '0.75rem', marginTop: '2px' }}>
+                                <span>Category: {act.category || 'Sightseeing'}</span>
+                                <span>Time: {act.time || '10:00 AM'}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                            <span style={{ fontWeight: 800, color: 'var(--accent)', fontSize: '0.95rem' }}>
+                              ${act.cost || act.estimatedCost || 0}
+                            </span>
                             <button
                               onClick={() => handleRemoveActivity(stop.id, act.id)}
-                              style={{
-                                background: 'transparent',
-                                border: 'none',
-                                color: 'var(--text-muted)',
-                                cursor: 'pointer',
-                                padding: '4px',
-                                borderRadius: '4px'
-                              }}
-                              title="Remove Activity"
+                              style={{ background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', padding: '4px' }}
+                              title="Delete Activity"
                             >
                               <Trash2 size={16} />
                             </button>
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem', background: 'var(--neutral-bg)', borderRadius: 'var(--radius-md)' }}>
-                        No activities added to {stop.city} yet. Click "+ Add Activity" above.
-                      </div>
-                    )}
-                  </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ padding: '1rem', textAlign: 'center', backgroundColor: 'var(--neutral-bg)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border)', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                      No activities planned for {stop.city} yet. Click "+ Add Activity" above.
+                    </div>
+                  )}
                 </div>
-              ))
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ padding: '3rem', textAlign: 'center', backgroundColor: 'var(--surface)', borderRadius: 'var(--radius-xl)', border: '1px dashed var(--border)' }}>
+            <Compass size={40} color="var(--primary)" style={{ opacity: 0.5, marginBottom: '0.5rem' }} />
+            <h3>No Destination Cities Added</h3>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Add your first destination city stop to build your itinerary.</p>
+            <Button variant="primary" onClick={() => setIsAddStopOpen(true)}>Add Destination Stop</Button>
+          </div>
+        )}
+
+        {/* Embedded Intercity Transport Manager (#11 in prompt) */}
+        <TransportManager tripId={id} stops={trip.stops || []} onTransportChange={(segs) => setTransportSegments(segs)} />
+
+        {/* Embedded Calendar & Day-Wise View (#9 & #10 in prompt) */}
+        <TripCalendarView trip={trip} onRemoveActivity={handleRemoveActivity} />
+
+        {/* Add Stop Modal */}
+        <Modal isOpen={isAddStopOpen} onClose={() => setIsAddStopOpen(false)} title="Add Destination City Stop">
+          <form onSubmit={handleAddStopSubmit}>
+            {stopError && (
+              <div style={{ color: 'var(--danger)', fontSize: '0.85rem', marginBottom: '1rem', fontWeight: 600 }}>
+                ⚠ {stopError}
+              </div>
             )}
-          </div>
-        </div>
-      </main>
 
-      {/* Modal: Add Stop */}
-      <Modal
-        isOpen={isAddStopOpen}
-        onClose={() => setIsAddStopOpen(false)}
-        title="Add Destination Stop"
-        maxWidth="500px"
-      >
-        <form onSubmit={handleAddStopSubmit}>
-          <Input
-            label="City Name"
-            value={newStopData.city}
-            onChange={(e) => setNewStopData({ ...newStopData, city: e.target.value })}
-            placeholder="e.g. Kyoto"
-            icon={<MapPin size={16} />}
-            required
-          />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <Input
-              label="Start Date"
-              type="date"
-              value={newStopData.startDate}
-              onChange={(e) => setNewStopData({ ...newStopData, startDate: e.target.value })}
-            />
-            <Input
-              label="End Date"
-              type="date"
-              value={newStopData.endDate}
-              onChange={(e) => setNewStopData({ ...newStopData, endDate: e.target.value })}
-            />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.25rem' }}>
-            <Button type="button" variant="outline" onClick={() => setIsAddStopOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" variant="primary" loading={submittingStop}>
-              Add Stop
-            </Button>
-          </div>
-        </form>
-      </Modal>
+            <div className="input-group">
+              <label className="input-label">Select City / Destination *</label>
+              <select
+                className="input-field"
+                value={stopForm.city}
+                onChange={(e) => {
+                  const selectedCityObj = availableCities.find(c => c.name === e.target.value);
+                  setStopForm({ ...stopForm, city: e.target.value, cityId: selectedCityObj ? selectedCityObj.id : null });
+                }}
+                required
+              >
+                <option value="">-- Choose a City --</option>
+                {availableCities.map(c => (
+                  <option key={c.id} value={c.name}>{c.name}, {c.country}</option>
+                ))}
+              </select>
+            </div>
 
-      {/* Modal: Add Activity */}
-      <Modal
-        isOpen={Boolean(addActivityStopId)}
-        onClose={() => setAddActivityStopId(null)}
-        title="Add Activity to Stop"
-        maxWidth="500px"
-      >
-        <form onSubmit={handleAddActivitySubmit}>
-          <Input
-            label="Activity Name"
-            value={newActivityData.name}
-            onChange={(e) => setNewActivityData({ ...newActivityData, name: e.target.value })}
-            placeholder="e.g. Guided Walking Tour & Local Lunch"
-            required
-          />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <Input
+                label="Stop Start Date"
+                type="date"
+                value={stopForm.startDate}
+                onChange={(e) => setStopForm({ ...stopForm, startDate: e.target.value })}
+                required
+              />
+              <Input
+                label="Stop End Date"
+                type="date"
+                value={stopForm.endDate}
+                onChange={(e) => setStopForm({ ...stopForm, endDate: e.target.value })}
+                required
+              />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.25rem' }}>
+              <Button type="button" variant="outline" onClick={() => setIsAddStopOpen(false)}>Cancel</Button>
+              <Button type="submit" variant="primary">Add City Stop</Button>
+            </div>
+          </form>
+        </Modal>
+
+        {/* Add Activity Modal */}
+        <Modal isOpen={isAddActivityOpen} onClose={() => setIsAddActivityOpen(false)} title={`Add Activity to ${activeStopForActivity?.city || 'Stop'}`}>
+          <form onSubmit={handleAddActivitySubmit}>
+            {activityError && (
+              <div style={{ color: 'var(--danger)', fontSize: '0.85rem', marginBottom: '1rem', fontWeight: 600 }}>
+                ⚠ {activityError}
+              </div>
+            )}
+
             <Input
-              label="Time"
-              value={newActivityData.time}
-              onChange={(e) => setNewActivityData({ ...newActivityData, time: e.target.value })}
-              placeholder="e.g. 10:00 AM"
+              label="Activity Name *"
+              value={activityForm.name}
+              onChange={(e) => setActivityForm({ ...activityForm, name: e.target.value })}
+              placeholder="e.g. Guided Louvre Museum Tour"
+              required
             />
+
+            <div className="input-group">
+              <label className="input-label">Category</label>
+              <select
+                className="input-field"
+                value={activityForm.category}
+                onChange={(e) => setActivityForm({ ...activityForm, category: e.target.value })}
+              >
+                <option value="Sightseeing">Sightseeing</option>
+                <option value="Food">Food & Dining</option>
+                <option value="Culture">Culture & Art</option>
+                <option value="Adventure">Adventure & Sports</option>
+                <option value="Nature">Nature & Wildlife</option>
+                <option value="Shopping">Shopping & Crafts</option>
+                <option value="Entertainment">Entertainment</option>
+              </select>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <Input
+                label="Activity Date"
+                type="date"
+                value={activityForm.date}
+                onChange={(e) => setActivityForm({ ...activityForm, date: e.target.value })}
+                required
+              />
+              <Input
+                label="Scheduled Time"
+                value={activityForm.time}
+                onChange={(e) => setActivityForm({ ...activityForm, time: e.target.value })}
+                placeholder="e.g. 10:00 AM"
+              />
+            </div>
+
             <Input
               label="Estimated Cost ($)"
               type="number"
-              value={newActivityData.cost}
-              onChange={(e) => setNewActivityData({ ...newActivityData, cost: e.target.value })}
-              placeholder="e.g. 30"
+              value={activityForm.cost}
+              onChange={(e) => setActivityForm({ ...activityForm, cost: e.target.value })}
+              placeholder="e.g. 35"
             />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.25rem' }}>
-            <Button type="button" variant="outline" onClick={() => setAddActivityStopId(null)}>
-              Cancel
-            </Button>
-            <Button type="submit" variant="primary" loading={submittingActivity}>
-              Add Activity
-            </Button>
-          </div>
-        </form>
-      </Modal>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.25rem' }}>
+              <Button type="button" variant="outline" onClick={() => setIsAddActivityOpen(false)}>Cancel</Button>
+              <Button type="submit" variant="primary">Add Activity</Button>
+            </div>
+          </form>
+        </Modal>
+      </main>
     </div>
   );
 }

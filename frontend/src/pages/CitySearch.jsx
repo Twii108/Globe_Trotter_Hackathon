@@ -1,294 +1,249 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Search, MapPin, Globe, Star, TrendingUp, Plus, Check, ArrowRight } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Button from '../components/Button';
+import Input from '../components/Input';
 import Modal from '../components/Modal';
-import { searchCities, getTrips, addStop } from '../services/api';
+import { Search, MapPin, DollarSign, Star, Plus, Heart, Filter, Compass } from 'lucide-react';
+import { searchCities, getTrips, addStop, toggleSaveCity } from '../services/api';
 import '../styles/dashboard.css';
 
-export default function CitySearch({ user, onLogout }) {
-  const navigate = useNavigate();
-
-  const [query, setQuery] = useState('');
+export default function CitySearch() {
   const [cities, setCities] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedRegion, setSelectedRegion] = useState('All');
+  const [maxCostIndex, setMaxCostIndex] = useState(10);
 
-  // Add to Trip Modal State
+  // Add to Trip Modal
   const [selectedCity, setSelectedCity] = useState(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [userTrips, setUserTrips] = useState([]);
   const [selectedTripId, setSelectedTripId] = useState('');
-  const [stopStartDate, setStopStartDate] = useState('');
-  const [stopEndDate, setStopEndDate] = useState('');
-  const [adding, setAdding] = useState(false);
-  const [successMsg, setSuccessMsg] = useState(null);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    fetchCities('');
+    loadCities();
+    loadUserTrips();
   }, []);
 
-  const fetchCities = async (q) => {
+  const loadCities = async () => {
     setLoading(true);
-    setError(null);
     try {
-      const results = await searchCities(q);
-      setCities(results);
+      const data = await searchCities('');
+      setCities(data);
     } catch (err) {
-      setError('Failed to load cities. Please try again.');
+      console.error(err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    fetchCities(query);
-  };
-
-  const handleOpenAddModal = async (city) => {
-    setSelectedCity(city);
-    setSuccessMsg(null);
+  const loadUserTrips = async () => {
     try {
       const trips = await getTrips();
       setUserTrips(trips);
-      if (trips.length > 0) {
-        setSelectedTripId(String(trips[0].id));
-        setStopStartDate(trips[0].startDate || '');
-        setStopEndDate(trips[0].endDate || '');
-      }
-    } catch (err) {
-      console.error(err);
-    }
+      if (trips.length > 0) setSelectedTripId(trips[0].id);
+    } catch (err) { }
+  };
+
+  const handleToggleHeart = async (cityId, e) => {
+    e.stopPropagation();
+    const newStatus = await toggleSaveCity(cityId);
+    setCities(cities.map(c => String(c.id) === String(cityId) ? { ...c, isSaved: newStatus } : c));
+  };
+
+  const handleOpenAddModal = (city) => {
+    setSelectedCity(city);
+    setIsAddModalOpen(true);
   };
 
   const handleAddStopSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedTripId || !selectedCity) return;
-    setAdding(true);
+    if (!selectedTripId) {
+      alert('Please select a trip.');
+      return;
+    }
+    setSubmitting(true);
     try {
       await addStop(selectedTripId, {
         city: selectedCity.name,
         cityId: selectedCity.id,
-        startDate: stopStartDate,
-        endDate: stopEndDate
+        startDate: startDate,
+        endDate: endDate
       });
-      setSuccessMsg(`Successfully added ${selectedCity.name} to your trip!`);
-      setTimeout(() => {
-        setSelectedCity(null);
-        navigate(`/trips/${selectedTripId}/builder`);
-      }, 1200);
+      alert(`Added ${selectedCity.name} to trip!`);
+      setIsAddModalOpen(false);
     } catch (err) {
-      alert('Failed to add city stop to trip.');
+      alert(err.message || 'Failed to add stop.');
     } finally {
-      setAdding(false);
+      setSubmitting(false);
     }
   };
 
-  return (
-    <div className="dashboard-page">
-      <Navbar user={user} onLogout={onLogout} />
+  const filteredCities = cities.filter(c => {
+    const matchesSearch = searchQuery === '' ||
+      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.country.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      c.region.toLowerCase().includes(searchQuery.toLowerCase());
 
-      <main className="dashboard-content" style={{ padding: '2rem 0 4rem 0' }}>
-        <div className="container">
-          {/* Title Header */}
-          <div style={{ marginBottom: '2rem' }}>
-            <h1 style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <Globe color="var(--primary)" size={32} />
-              Explore & Search Cities
-            </h1>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', marginTop: '0.25rem' }}>
-              Discover global destinations, compare cost indices, popularity ratings, and add cities to your trip itinerary.
-            </p>
+    const matchesRegion = selectedRegion === 'All' || c.region === selectedRegion;
+    const matchesCost = c.costIndex <= maxCostIndex;
+
+    return matchesSearch && matchesRegion && matchesCost;
+  });
+
+  return (
+    <div className="dashboard-layout">
+      <Navbar activeTab="cities" />
+
+      <main className="dashboard-content">
+        <div style={{ marginBottom: '1.5rem' }}>
+          <h1 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-main)' }}>
+            City & Destination Discovery
+          </h1>
+          <p style={{ margin: '0.25rem 0 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+            Explore top destinations, check cost ratings, save favorites to profile, and add stops to your itineraries.
+          </p>
+        </div>
+
+        {/* Search & Multi-Filter Toolbar */}
+        <div style={{ backgroundColor: 'var(--surface)', padding: '1rem 1.25rem', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', boxShadow: 'var(--shadow-sm)' }}>
+          <div style={{ flex: '1 1 300px' }}>
+            <Input
+              icon={<Search size={18} />}
+              placeholder="Search by city name, country, region..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
 
-          {/* Search Form */}
-          <form onSubmit={handleSearchSubmit} style={{ marginBottom: '2rem' }}>
-            <div
-              style={{
-                display: 'flex',
-                gap: '0.75rem',
-                backgroundColor: 'var(--surface)',
-                padding: '0.75rem 1rem',
-                borderRadius: 'var(--radius-lg)',
-                border: '1px solid var(--border)',
-                boxShadow: 'var(--shadow-sm)'
-              }}
-            >
-              <div style={{ position: 'relative', flex: 1 }}>
-                <Search size={20} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                <input
-                  type="text"
-                  placeholder="Search city, country, or region (e.g. Paris, Japan, Europe)..."
-                  value={query}
-                  onChange={(e) => {
-                    setQuery(e.target.value);
-                    fetchCities(e.target.value);
-                  }}
-                  className="input-field"
-                  style={{ paddingLeft: '2.75rem', fontSize: '1rem' }}
-                />
-              </div>
-              <Button type="submit" variant="primary" icon={<Search size={18} />}>
-                Search
-              </Button>
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+              <Filter size={15} /> Region:
+              <select
+                value={selectedRegion}
+                onChange={(e) => setSelectedRegion(e.target.value)}
+                style={{ padding: '6px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', backgroundColor: 'var(--surface)', fontWeight: 600, fontSize: '0.85rem' }}
+              >
+                <option value="All">All Regions</option>
+                <option value="Europe">Europe</option>
+                <option value="Asia">Asia</option>
+                <option value="North America">North America</option>
+                <option value="South America">South America</option>
+                <option value="Africa">Africa</option>
+                <option value="Oceania">Oceania</option>
+                <option value="Middle East">Middle East</option>
+              </select>
             </div>
-          </form>
+          </div>
+        </div>
 
-          {/* Error Banner */}
-          {error && (
-            <div style={{ padding: '1rem', background: '#FEE2E2', color: 'var(--danger)', borderRadius: 'var(--radius-md)', marginBottom: '1.5rem' }}>
-              {error}
-            </div>
-          )}
-
-          {/* Results Grid */}
-          {loading ? (
-            <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-              Searching world destinations...
-            </div>
-          ) : cities.length > 0 ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
-              {cities.map((city) => (
-                <div
-                  key={city.id}
-                  className="card"
+        {/* City Cards Grid */}
+        {loading ? (
+          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading destination database...</div>
+        ) : filteredCities.length > 0 ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
+            {filteredCities.map((city) => (
+              <div
+                key={city.id}
+                style={{
+                  backgroundColor: 'var(--surface)',
+                  borderRadius: 'var(--radius-xl)',
+                  border: '1px solid var(--border)',
+                  overflow: 'hidden',
+                  boxShadow: 'var(--shadow-sm)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justify: 'space-between',
+                  position: 'relative'
+                }}
+              >
+                {/* Heart Save Button (#19 in prompt) */}
+                <button
+                  onClick={(e) => handleToggleHeart(city.id, e)}
                   style={{
-                    padding: '1.5rem',
-                    backgroundColor: 'var(--surface)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--radius-lg)',
-                    boxShadow: 'var(--shadow-sm)',
+                    position: 'absolute',
+                    top: '12px',
+                    right: '12px',
+                    width: '34px',
+                    height: '34px',
+                    borderRadius: '50%',
+                    backgroundColor: 'rgba(255,255,255,0.9)',
+                    border: 'none',
                     display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between'
+                    alignItems: 'center',
+                    justify: 'center',
+                    cursor: 'pointer',
+                    boxShadow: 'var(--shadow-sm)',
+                    zIndex: 2
                   }}
+                  title={city.isSaved ? 'Unsave Destination' : 'Save Destination'}
                 >
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                      <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)' }}>
-                        {city.name}
-                      </h3>
-                      <span className="tag-badge" style={{ backgroundColor: 'var(--primary-light)', color: 'var(--primary)', fontWeight: 700 }}>
-                        {city.region || 'Global'}
-                      </span>
-                    </div>
+                  <Heart size={18} color={city.isSaved ? '#ef4444' : '#64748b'} fill={city.isSaved ? '#ef4444' : 'none'} />
+                </button>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '0.75rem' }}>
-                      <MapPin size={15} color="var(--primary)" />
-                      <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{city.country}</span>
-                    </div>
-
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.45, marginBottom: '1rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                      {city.description}
-                    </p>
-
-                    {/* Stats pills: Cost Index & Popularity */}
-                    <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem' }}>
-                      <div style={{ padding: '4px 10px', background: 'var(--neutral-bg)', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)' }}>
-                        Cost Index: <span style={{ color: 'var(--accent)' }}>{'$'.repeat(Math.min(3, Math.ceil((city.costIndex || 5) / 3)))} ({city.costIndex || 5}/10)</span>
-                      </div>
-                      <div style={{ padding: '4px 10px', background: 'rgba(245,158,11,0.1)', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600, color: '#D97706', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                        <Star size={13} fill="#D97706" /> {city.popularity || 85}% Score
-                      </div>
-                    </div>
+                <div style={{ padding: '1.25rem' }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', tracking: '0.5px' }}>
+                    {city.region}
+                  </div>
+                  <h3 style={{ margin: '0.2rem 0 0.2rem', fontSize: '1.2rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                    {city.name}
+                  </h3>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                    📍 {city.country}
                   </div>
 
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    full
-                    icon={<Plus size={16} />}
-                    onClick={() => handleOpenAddModal(city)}
-                  >
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '0 0 1rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    {city.description}
+                  </p>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.825rem', padding: '0.6rem 0', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', marginBottom: '1rem' }}>
+                    <span>Cost Index: <strong>{'$'.repeat(Math.min(3, Math.ceil(city.costIndex / 3)))}</strong></span>
+                    <span>★ <strong>{(city.popularity / 20).toFixed(1)}</strong></span>
+                  </div>
+
+                  <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={() => handleOpenAddModal(city)}>
                     Add to Trip
                   </Button>
                 </div>
-              ))}
-            </div>
-          ) : (
-            /* Empty State */
-            <div className="empty-state">
-              <Globe size={40} color="var(--primary)" style={{ opacity: 0.5, marginBottom: '0.5rem' }} />
-              <h3 className="empty-state-title">No Cities Found</h3>
-              <p className="empty-state-text">No cities matched "{query}". Try searching another region or country.</p>
-            </div>
-          )}
-        </div>
-      </main>
-
-      {/* Add City to Trip Modal */}
-      <Modal
-        isOpen={Boolean(selectedCity)}
-        onClose={() => setSelectedCity(null)}
-        title={`Add ${selectedCity?.name} to Trip`}
-        maxWidth="500px"
-      >
-        {successMsg ? (
-          <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--success)', fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-            <Check size={32} />
-            <span>{successMsg}</span>
+              </div>
+            ))}
           </div>
         ) : (
-          <form onSubmit={handleAddStopSubmit}>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
-              Select which trip itinerary you want to add <strong>{selectedCity?.name}, {selectedCity?.country}</strong> to:
-            </p>
+          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>No cities found matching your criteria.</div>
+        )}
 
-            {userTrips.length === 0 ? (
-              <div style={{ padding: '1rem', textAlign: 'center', background: 'var(--neutral-bg)', borderRadius: 'var(--radius-md)', marginBottom: '1rem' }}>
-                You don't have any trips yet. <Button variant="text" onClick={() => navigate('/trips/create')}>Create Trip First</Button>
-              </div>
-            ) : (
-              <div className="input-group">
-                <label className="input-label">Select Target Trip</label>
-                <select
-                  value={selectedTripId}
-                  onChange={(e) => setSelectedTripId(e.target.value)}
-                  className="input-field"
-                  required
-                >
-                  {userTrips.map(t => (
-                    <option key={t.id} value={t.id}>
-                      {t.name || t.destination} ({t.startDate} - {t.endDate})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+        {/* Add to Trip Modal */}
+        <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title={`Add ${selectedCity?.name} to Itinerary`}>
+          <form onSubmit={handleAddStopSubmit}>
+            <div className="input-group">
+              <label className="input-label">Select Destination Trip *</label>
+              <select
+                className="input-field"
+                value={selectedTripId}
+                onChange={(e) => setSelectedTripId(e.target.value)}
+                required
+              >
+                {userTrips.map(t => (
+                  <option key={t.id} value={t.id}>{t.name} ({t.startDate})</option>
+                ))}
+              </select>
+            </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-              <div className="input-group">
-                <label className="input-label">Stop Start Date</label>
-                <input
-                  type="date"
-                  className="input-field"
-                  value={stopStartDate}
-                  onChange={(e) => setStopStartDate(e.target.value)}
-                />
-              </div>
-              <div className="input-group">
-                <label className="input-label">Stop End Date</label>
-                <input
-                  type="date"
-                  className="input-field"
-                  value={stopEndDate}
-                  onChange={(e) => setStopEndDate(e.target.value)}
-                />
-              </div>
+              <Input label="Stop Start Date" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              <Input label="Stop End Date" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
-              <Button type="button" variant="outline" onClick={() => setSelectedCity(null)}>
-                Cancel
-              </Button>
-              <Button type="submit" variant="primary" loading={adding} disabled={userTrips.length === 0}>
-                Add City Stop
-              </Button>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.25rem' }}>
+              <Button type="button" variant="outline" onClick={() => setIsAddModalOpen(false)}>Cancel</Button>
+              <Button type="submit" variant="primary" loading={submitting}>Add Stop</Button>
             </div>
           </form>
-        )}
-      </Modal>
+        </Modal>
+      </main>
     </div>
   );
 }

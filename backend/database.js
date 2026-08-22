@@ -55,15 +55,49 @@ function runMigrationsAsync() {
       });
     };
 
+    const createTableIfMissing = (sql) => {
+      return new Promise((resTbl) => {
+        db.run(sql, (err) => {
+          if (err) console.error('Migration table error:', err.message);
+          resTbl();
+        });
+      });
+    };
+
     Promise.all([
       addColumnIfMissing('users', 'avatar', 'TEXT'),
       addColumnIfMissing('users', 'preferred_currency', "TEXT DEFAULT 'USD'"),
+      addColumnIfMissing('users', 'travel_style', "TEXT DEFAULT 'Balanced Explorer'"),
       addColumnIfMissing('trips', 'budget', 'REAL DEFAULT 0'),
       addColumnIfMissing('trips', 'share_id', 'TEXT'),
       addColumnIfMissing('trips', 'is_public', 'INTEGER DEFAULT 0'),
       addColumnIfMissing('trips', 'updated_at', 'DATETIME'),
       addColumnIfMissing('expenses', 'expense_date', 'TEXT'),
-      addColumnIfMissing('trip_activities', 'position', 'INTEGER DEFAULT 0')
+      addColumnIfMissing('trip_activities', 'position', 'INTEGER DEFAULT 0'),
+      createTableIfMissing(`
+        CREATE TABLE IF NOT EXISTS transport_segments (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          trip_id INTEGER NOT NULL,
+          mode TEXT NOT NULL,
+          departure_location TEXT,
+          arrival_location TEXT,
+          departure_time TEXT,
+          arrival_time TEXT,
+          cost REAL DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (trip_id) REFERENCES trips(id) ON DELETE CASCADE
+        );
+      `),
+      createTableIfMissing(`
+        CREATE TABLE IF NOT EXISTS saved_destinations (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          city_id INTEGER NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          FOREIGN KEY (city_id) REFERENCES cities(id) ON DELETE CASCADE
+        );
+      `)
     ]).then(resolve);
   });
 }

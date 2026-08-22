@@ -15,6 +15,7 @@ const cityRoutes = require('./routes/cities');
 const expenseRoutes = require('./routes/expenses');
 const shareRoutes = require('./routes/share');
 const profileRoutes = require('./routes/profile');
+const transportRoutes = require('./routes/transport');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -40,6 +41,7 @@ app.use('/api/cities', cityRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/shared', shareRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/transport', transportRoutes);
 
 // 404 Handler
 app.use((req, res, next) => {

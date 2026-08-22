@@ -177,7 +177,7 @@ export default function App() {
         path="/trips/:id"
         element={
           currentUser ? (
-            <ItineraryView user={currentUser} onLogout={handleLogout} />
+            <ItineraryBuilder user={currentUser} onLogout={handleLogout} />
           ) : (
             <Navigate to="/login" replace />
           )
@@ -212,6 +212,12 @@ export default function App() {
             <Navigate to="/login" replace />
           )
         }
+      />
+
+      {/* Public Unauthenticated Share Route */}
+      <Route
+        path="/shared/:shareId"
+        element={<PublicShareScreen />}
       />
 
       {/* Fallback Catch-all */}

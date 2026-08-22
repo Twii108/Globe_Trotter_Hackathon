@@ -35,6 +35,11 @@ const {
   generateShareLink
 } = require('../controllers/shareController');
 
+const {
+  getTripTransport,
+  addTransportSegment
+} = require('../controllers/transportController');
+
 // All trip routes require authentication
 router.use(authMiddleware);
 
@@ -53,6 +58,10 @@ router.put('/:id/stops/reorder', reorderStops);
 // Nested Trip Activities
 router.post('/:id/activities', addTripActivity);
 router.delete('/:id/activities/:activityId', removeTripActivity);
+
+// Transport Segments
+router.get('/:id/transport', getTripTransport);
+router.post('/:id/transport', addTransportSegment);
 
 // Budget & Timeline
 router.get('/:id/budget', getTripBudget);

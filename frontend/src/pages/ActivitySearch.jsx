@@ -1,46 +1,42 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Compass, Search, Filter, Clock, DollarSign, Plus, Check, MapPin, Tag } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import Button from '../components/Button';
+import Input from '../components/Input';
 import Modal from '../components/Modal';
-import { searchActivities, getTrips, addActivity } from '../services/api';
+import { Search, Clock, DollarSign, Plus, Filter, Tag, Compass, ArrowUpDown } from 'lucide-react';
+import { getActivities, getTrips, addActivity } from '../services/api';
 import '../styles/dashboard.css';
 
-const CATEGORIES = ['All', 'Sightseeing', 'Culture', 'Nature', 'Food', 'Adventure', 'Shopping'];
+const CATEGORIES = ['All', 'Sightseeing', 'Food', 'Culture', 'Adventure', 'Nature', 'Entertainment', 'Shopping'];
 
-export default function ActivitySearch({ user, onLogout }) {
-  const navigate = useNavigate();
-
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
-  const [maxCostFilter, setMaxCostFilter] = useState('');
+export default function ActivitySearch() {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [maxCostFilter, setMaxCostFilter] = useState('1000');
+  const [sortBy, setSortBy] = useState('price_low'); // 'price_low' | 'price_high' | 'duration'
 
   // Add Activity Modal
   const [selectedActivity, setSelectedActivity] = useState(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [userTrips, setUserTrips] = useState([]);
   const [selectedTripId, setSelectedTripId] = useState('');
   const [selectedStopId, setSelectedStopId] = useState('');
-  const [scheduledTime, setScheduledTime] = useState('10:00 AM');
   const [scheduledDate, setScheduledDate] = useState('');
-  const [adding, setAdding] = useState(false);
-  const [successMsg, setSuccessMsg] = useState(null);
+  const [scheduledTime, setScheduledTime] = useState('10:00 AM');
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    fetchActivities();
-  }, [selectedCategory, maxCostFilter]);
+    loadActivities();
+    loadUserTrips();
+  }, []);
 
-  const fetchActivities = async () => {
+  const loadActivities = async () => {
     setLoading(true);
     try {
-      const results = await searchActivities({
-        category: selectedCategory,
-        maxCost: maxCostFilter,
-        searchQuery
-      });
-      setActivities(results);
+      const data = await getActivities({});
+      setActivities(data);
     } catch (err) {
       console.error(err);
     } finally {
@@ -48,328 +44,253 @@ export default function ActivitySearch({ user, onLogout }) {
     }
   };
 
-  const handleSearchSubmit = (e) => {
-    e.preventDefault();
-    fetchActivities();
-  };
-
-  const handleOpenAddModal = async (act) => {
-    setSelectedActivity(act);
-    setSuccessMsg(null);
+  const loadUserTrips = async () => {
     try {
       const trips = await getTrips();
       setUserTrips(trips);
       if (trips.length > 0) {
-        setSelectedTripId(String(trips[0].id));
-        const firstStop = trips[0].stops && trips[0].stops.length > 0 ? trips[0].stops[0] : null;
-        setSelectedStopId(firstStop ? String(firstStop.id) : '');
-        setScheduledDate(firstStop ? firstStop.startDate : (trips[0].startDate || ''));
+        setSelectedTripId(trips[0].id);
+        if (trips[0].stops && trips[0].stops.length > 0) {
+          setSelectedStopId(trips[0].stops[0].id);
+        }
       }
-    } catch (err) {
-      console.error(err);
-    }
+    } catch (err) { }
   };
 
-  const handleTripChange = (e) => {
-    const tripId = e.target.value;
-    setSelectedTripId(tripId);
-    const trip = userTrips.find(t => String(t.id) === String(tripId));
-    if (trip && trip.stops && trip.stops.length > 0) {
-      setSelectedStopId(String(trip.stops[0].id));
-      setScheduledDate(trip.stops[0].startDate);
-    } else {
-      setSelectedStopId('');
-    }
+  const handleOpenAddModal = (act) => {
+    setSelectedActivity(act);
+    setIsAddModalOpen(true);
   };
 
-  const handleAddActivitySubmit = async (e) => {
+  const handleAddSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedTripId || !selectedActivity) return;
-    setAdding(true);
+    if (!selectedTripId || !selectedStopId) {
+      alert('Please select a trip and destination stop.');
+      return;
+    }
+    setSubmitting(true);
     try {
       await addActivity(selectedTripId, selectedStopId, {
+        activityId: selectedActivity.id,
         name: selectedActivity.name,
+        category: selectedActivity.category,
+        date: scheduledDate,
         time: scheduledTime,
-        cost: selectedActivity.estimatedCost || selectedActivity.cost || 0,
-        date: scheduledDate
+        cost: selectedActivity.cost
       });
-      setSuccessMsg(`Added "${selectedActivity.name}" to your itinerary!`);
-      setTimeout(() => {
-        setSelectedActivity(null);
-        navigate(`/trips/${selectedTripId}/builder`);
-      }, 1200);
+      alert(`Added "${selectedActivity.name}" to trip itinerary!`);
+      setIsAddModalOpen(false);
     } catch (err) {
-      alert('Failed to attach activity to trip.');
+      alert(err.message || 'Failed to add activity.');
     } finally {
-      setAdding(false);
+      setSubmitting(false);
     }
   };
 
-  const activeTrip = userTrips.find(t => String(t.id) === String(selectedTripId));
-  const availableStops = activeTrip?.stops || [];
+  const filteredActivities = activities.filter(a => {
+    const matchesSearch = searchQuery === '' ||
+      a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      a.cityName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      a.description.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesCategory = selectedCategory === 'All' || a.category?.toLowerCase() === selectedCategory.toLowerCase();
+    const matchesCost = a.cost <= Number(maxCostFilter);
+
+    return matchesSearch && matchesCategory && matchesCost;
+  }).sort((a, b) => {
+    if (sortBy === 'price_high') return b.cost - a.cost;
+    if (sortBy === 'duration') return b.duration - a.duration;
+    return a.cost - b.cost; // price low default
+  });
+
+  const activeTripObj = userTrips.find(t => String(t.id) === String(selectedTripId));
 
   return (
-    <div className="dashboard-page">
-      <Navbar user={user} onLogout={onLogout} />
+    <div className="dashboard-layout">
+      <Navbar activeTab="activities" />
 
-      <main className="dashboard-content" style={{ padding: '2rem 0 4rem 0' }}>
-        <div className="container">
-          {/* Header */}
-          <div style={{ marginBottom: '2rem' }}>
-            <h1 style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <Compass color="var(--primary)" size={32} />
-              Activity Catalog & Discovery
-            </h1>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', marginTop: '0.25rem' }}>
-              Find tours, cultural experiences, adventure activities, and gourmet food walks. Filter by category, budget, or duration.
-            </p>
+      <main className="dashboard-content">
+        <div style={{ marginBottom: '1.5rem' }}>
+          <h1 style={{ margin: 0, fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-main)' }}>
+            Activity & Experience Catalog
+          </h1>
+          <p style={{ margin: '0.25rem 0 0', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+            Discover tours, museum passes, street food walks, and thrill activities across your favorite destination cities.
+          </p>
+        </div>
+
+        {/* Category Filter Pills (#8 in prompt) */}
+        <div style={{ display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.75rem', marginBottom: '1.25rem' }}>
+          {CATEGORIES.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              style={{
+                padding: '6px 16px',
+                borderRadius: '20px',
+                border: '1px solid var(--border)',
+                backgroundColor: selectedCategory === cat ? 'var(--primary)' : 'var(--surface)',
+                color: selectedCategory === cat ? '#fff' : 'var(--text-main)',
+                fontWeight: 700,
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                boxShadow: selectedCategory === cat ? 'var(--shadow-sm)' : 'none'
+              }}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        {/* Search & Toolbar */}
+        <div style={{ backgroundColor: 'var(--surface)', padding: '1rem 1.25rem', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', boxShadow: 'var(--shadow-sm)' }}>
+          <div style={{ flex: '1 1 300px' }}>
+            <Input
+              icon={<Search size={18} />}
+              placeholder="Search activities by name or city..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
 
-          {/* Search & Filters */}
-          <div
-            style={{
-              backgroundColor: 'var(--surface)',
-              padding: '1.25rem',
-              borderRadius: 'var(--radius-lg)',
-              border: '1px solid var(--border)',
-              boxShadow: 'var(--shadow-sm)',
-              marginBottom: '2rem',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '1rem'
-            }}
-          >
-            <form onSubmit={handleSearchSubmit} style={{ display: 'flex', gap: '0.75rem' }}>
-              <div style={{ position: 'relative', flex: 1 }}>
-                <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                <input
-                  type="text"
-                  placeholder="Search activity name or keywords (e.g., Museum, Hiking, Food)..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="input-field"
-                  style={{ paddingLeft: '2.5rem' }}
-                />
-              </div>
-              <Button type="submit" variant="primary" icon={<Search size={16} />}>
-                Filter
-              </Button>
-            </form>
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+              <DollarSign size={15} /> Max Cost:
+              <select
+                value={maxCostFilter}
+                onChange={(e) => setMaxCostFilter(e.target.value)}
+                style={{ padding: '6px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', backgroundColor: 'var(--surface)', fontWeight: 600, fontSize: '0.85rem' }}
+              >
+                <option value="1000">Any Cost</option>
+                <option value="0">Free Only</option>
+                <option value="30">Under $30</option>
+                <option value="100">Under $100</option>
+              </select>
+            </div>
 
-            {/* Category Pills & Cost Filter */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-              {/* Category Pills */}
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                  <Tag size={14} /> Category:
-                </span>
-                {CATEGORIES.map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    style={{
-                      padding: '0.35rem 0.85rem',
-                      borderRadius: 'var(--radius-full)',
-                      fontSize: '0.85rem',
-                      fontWeight: 600,
-                      border: 'none',
-                      cursor: 'pointer',
-                      backgroundColor: selectedCategory === cat ? 'var(--primary)' : 'var(--neutral-bg)',
-                      color: selectedCategory === cat ? '#fff' : 'var(--text-main)',
-                      transition: 'var(--transition)'
-                    }}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-
-              {/* Max Cost Dropdown */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <DollarSign size={16} style={{ color: 'var(--text-muted)' }} />
-                <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>Max Cost:</span>
-                <select
-                  value={maxCostFilter}
-                  onChange={(e) => setMaxCostFilter(e.target.value)}
-                  className="input-field"
-                  style={{ width: 'auto', padding: '0.4rem 0.85rem', fontSize: '0.85rem' }}
-                >
-                  <option value="">Any Cost</option>
-                  <option value="0">Free Only ($0)</option>
-                  <option value="30">Under $30</option>
-                  <option value="100">Under $100</option>
-                </select>
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+              <ArrowUpDown size={15} /> Sort:
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                style={{ padding: '6px 12px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', backgroundColor: 'var(--surface)', fontWeight: 600, fontSize: '0.85rem' }}
+              >
+                <option value="price_low">Price: Low to High</option>
+                <option value="price_high">Price: High to Low</option>
+                <option value="duration">Duration</option>
+              </select>
             </div>
           </div>
+        </div>
 
-          {/* Results Grid */}
-          {loading ? (
-            <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-              Filtering activities...
-            </div>
-          ) : activities.length > 0 ? (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
-              {activities.map((act) => (
-                <div
-                  key={act.id}
-                  className="card"
-                  style={{
-                    padding: '1.5rem',
-                    backgroundColor: 'var(--surface)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--radius-lg)',
-                    boxShadow: 'var(--shadow-sm)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between'
-                  }}
-                >
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                      <span className="tag-badge" style={{ backgroundColor: 'var(--primary-light)', color: 'var(--primary)', fontWeight: 700 }}>
-                        {act.category || 'General'}
-                      </span>
-                      <span style={{ fontSize: '1rem', fontWeight: 800, color: 'var(--accent)' }}>
-                        {(act.estimatedCost || act.cost) > 0 ? `$${act.estimatedCost || act.cost}` : 'FREE'}
-                      </span>
-                    </div>
-
-                    <h3 style={{ margin: '0 0 0.4rem 0', fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                      {act.name}
-                    </h3>
-
-                    {act.cityName && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
-                        <MapPin size={14} color="var(--primary)" />
-                        <span>{act.cityName}</span>
-                      </div>
-                    )}
-
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: 1.45, marginBottom: '1rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                      {act.description}
-                    </p>
-
-                    <div style={{ display: 'flex', gap: '1rem', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1.25rem' }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                        <Clock size={14} /> Est. {act.duration || 2} Hours
-                      </span>
-                    </div>
+        {/* Activity Cards Grid */}
+        {loading ? (
+          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading activity catalog...</div>
+        ) : filteredActivities.length > 0 ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1.5rem' }}>
+            {filteredActivities.map((act) => (
+              <div
+                key={act.id}
+                style={{
+                  backgroundColor: 'var(--surface)',
+                  borderRadius: 'var(--radius-xl)',
+                  border: '1px solid var(--border)',
+                  overflow: 'hidden',
+                  padding: '1.25rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justify: 'space-between',
+                  boxShadow: 'var(--shadow-sm)'
+                }}
+              >
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--primary)', backgroundColor: 'var(--primary-light)', padding: '3px 10px', borderRadius: '12px' }}>
+                      {act.category || 'Sightseeing'}
+                    </span>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      📍 {act.cityName || 'City'}
+                    </span>
                   </div>
 
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    full
-                    icon={<Plus size={16} />}
-                    onClick={() => handleOpenAddModal(act)}
-                  >
-                    Add Activity
-                  </Button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="empty-state">
-              <Compass size={40} color="var(--primary)" style={{ opacity: 0.5, marginBottom: '0.5rem' }} />
-              <h3 className="empty-state-title">No Activities Match Criteria</h3>
-              <p className="empty-state-text">Try resetting filters to explore more activities.</p>
-            </div>
-          )}
-        </div>
-      </main>
+                  <h3 style={{ margin: '0.2rem 0 0.3rem', fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                    {act.name}
+                  </h3>
 
-      {/* Add Activity Modal */}
-      <Modal
-        isOpen={Boolean(selectedActivity)}
-        onClose={() => setSelectedActivity(null)}
-        title={`Add "${selectedActivity?.name}" to Trip`}
-        maxWidth="500px"
-      >
-        {successMsg ? (
-          <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--success)', fontWeight: 700, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-            <Check size={32} />
-            <span>{successMsg}</span>
+                  <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', margin: '0 0 1rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                    {act.description}
+                  </p>
+
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.825rem', padding: '0.6rem 0', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', marginBottom: '1rem' }}>
+                    <span>Duration: <strong>{act.duration || 1.5}h</strong></span>
+                    <span style={{ fontWeight: 800, color: 'var(--accent)', fontSize: '0.95rem' }}>
+                      {act.cost === 0 ? 'FREE' : `$${act.cost}`}
+                    </span>
+                  </div>
+                </div>
+
+                <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={() => handleOpenAddModal(act)}>
+                  Add Activity
+                </Button>
+              </div>
+            ))}
           </div>
         ) : (
-          <form onSubmit={handleAddActivitySubmit}>
-            {userTrips.length === 0 ? (
-              <div style={{ padding: '1rem', textAlign: 'center', background: 'var(--neutral-bg)', borderRadius: 'var(--radius-md)', marginBottom: '1rem' }}>
-                No active trips. <Button variant="text" onClick={() => navigate('/trips/create')}>Create Trip First</Button>
+          <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+            No activities found matching your filter criteria.
+          </div>
+        )}
+
+        {/* Add Activity Modal */}
+        <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title={`Add "${selectedActivity?.name}" to Trip`}>
+          <form onSubmit={handleAddSubmit}>
+            <div className="input-group">
+              <label className="input-label">Select Trip *</label>
+              <select
+                className="input-field"
+                value={selectedTripId}
+                onChange={(e) => {
+                  setSelectedTripId(e.target.value);
+                  const t = userTrips.find(trip => String(trip.id) === String(e.target.value));
+                  if (t && t.stops && t.stops.length > 0) setSelectedStopId(t.stops[0].id);
+                }}
+                required
+              >
+                {userTrips.map(t => (
+                  <option key={t.id} value={t.id}>{t.name} ({t.startDate})</option>
+                ))}
+              </select>
+            </div>
+
+            {activeTripObj && activeTripObj.stops && activeTripObj.stops.length > 0 && (
+              <div className="input-group">
+                <label className="input-label">Select City Stop *</label>
+                <select
+                  className="input-field"
+                  value={selectedStopId}
+                  onChange={(e) => setSelectedStopId(e.target.value)}
+                  required
+                >
+                  {activeTripObj.stops.map(s => (
+                    <option key={s.id} value={s.id}>{s.city} ({s.startDate} ➔ {s.endDate})</option>
+                  ))}
+                </select>
               </div>
-            ) : (
-              <>
-                <div className="input-group">
-                  <label className="input-label">Select Trip</label>
-                  <select
-                    value={selectedTripId}
-                    onChange={handleTripChange}
-                    className="input-field"
-                    required
-                  >
-                    {userTrips.map(t => (
-                      <option key={t.id} value={t.id}>
-                        {t.name || t.destination}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="input-group">
-                  <label className="input-label">Select Destination Stop</label>
-                  <select
-                    value={selectedStopId}
-                    onChange={(e) => setSelectedStopId(e.target.value)}
-                    className="input-field"
-                    required
-                  >
-                    {availableStops.length > 0 ? (
-                      availableStops.map(s => (
-                        <option key={s.id} value={s.id}>
-                          {s.city} ({s.startDate})
-                        </option>
-                      ))
-                    ) : (
-                      <option value="">Main Trip (Default Stop)</option>
-                    )}
-                  </select>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div className="input-group">
-                    <label className="input-label">Scheduled Time</label>
-                    <input
-                      type="text"
-                      className="input-field"
-                      value={scheduledTime}
-                      onChange={(e) => setScheduledTime(e.target.value)}
-                      placeholder="e.g. 10:00 AM"
-                    />
-                  </div>
-                  <div className="input-group">
-                    <label className="input-label">Scheduled Date</label>
-                    <input
-                      type="date"
-                      className="input-field"
-                      value={scheduledDate}
-                      onChange={(e) => setScheduledDate(e.target.value)}
-                    />
-                  </div>
-                </div>
-              </>
             )}
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
-              <Button type="button" variant="outline" onClick={() => setSelectedActivity(null)}>
-                Cancel
-              </Button>
-              <Button type="submit" variant="primary" loading={adding} disabled={userTrips.length === 0}>
-                Add Activity
-              </Button>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <Input label="Scheduled Date" type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} required />
+              <Input label="Scheduled Time" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} placeholder="e.g. 10:00 AM" />
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.25rem' }}>
+              <Button type="button" variant="outline" onClick={() => setIsAddModalOpen(false)}>Cancel</Button>
+              <Button type="submit" variant="primary" loading={submitting}>Add Activity</Button>
             </div>
           </form>
-        )}
-      </Modal>
+        </Modal>
+      </main>
     </div>
   );
 }

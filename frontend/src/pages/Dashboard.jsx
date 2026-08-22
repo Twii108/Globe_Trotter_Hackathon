@@ -1,396 +1,273 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { 
-  Plus, 
-  MapPin, 
-  Calendar, 
-  DollarSign, 
-  Sparkles, 
-  Compass, 
-  Star, 
-  TrendingUp, 
-  FolderX
-} from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import Card from '../components/Card';
 import Button from '../components/Button';
-import Input from '../components/Input';
-import Modal from '../components/Modal';
-import { tripService, authService } from '../services/api';
+import {
+  Compass, MapPin, Calendar, DollarSign, Plus, Eye, Edit, Trash2,
+  Copy, Sparkles, TrendingUp, CheckCircle, AlertTriangle, User
+} from 'lucide-react';
+import {
+  getTrips,
+  deleteTrip,
+  duplicateTrip,
+  authService,
+  tripService,
+  calculateTripBudget
+} from '../services/api';
 import '../styles/dashboard.css';
 
-export default function Dashboard({ user, onLogout }) {
+export default function Dashboard() {
   const navigate = useNavigate();
-  const [currentUser, setCurrentUser] = useState(user || null);
+  const [user, setUser] = useState(null);
   const [trips, setTrips] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
-  const [budget, setBudget] = useState({ totalBudget: 0, totalSpent: 0, remaining: 0, currency: '$' });
   const [loading, setLoading] = useState(true);
 
-  // New Trip Modal state
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newTripData, setNewTripData] = useState({
-    destination: '',
-    country: '',
-    startDate: '',
-    endDate: '',
-    budget: '',
-    tags: ''
-  });
-  const [submittingTrip, setSubmittingTrip] = useState(false);
-
   useEffect(() => {
-    fetchDashboardData();
+    loadDashboardData();
   }, []);
 
-  const fetchDashboardData = async () => {
+  const loadDashboardData = async () => {
     setLoading(true);
     try {
-      if (!user) {
-        const userData = await authService.getCurrentUser();
-        setCurrentUser(userData);
-      }
-      const [tripsData, recsData, budgetData] = await Promise.all([
-        tripService.getUpcomingTrips(),
-        tripService.getRecommendedDestinations(),
-        tripService.getBudgetSummary()
-      ]);
+      const currentUser = await authService.getCurrentUser();
+      setUser(currentUser);
+
+      const tripsData = await getTrips();
       setTrips(tripsData);
-      setRecommendations(recsData);
-      setBudget(budgetData);
+
+      const recs = await tripService.getRecommendedDestinations();
+      setRecommendations(recs);
     } catch (err) {
-      console.error('Error loading dashboard data:', err);
+      console.error('Dashboard load error:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreateTripSubmit = async (e) => {
-    e.preventDefault();
-    if (!newTripData.destination.trim()) {
-      alert('Please enter a destination name.');
-      return;
-    }
-
-    setSubmittingTrip(true);
-    try {
-      const created = await tripService.createTrip({
-        ...newTripData,
-        tags: newTripData.tags ? newTripData.tags.split(',').map(t => t.trim()) : ['Vacation']
-      });
-      setTrips((prev) => [created, ...prev]);
-
-      const updatedBudget = await tripService.getBudgetSummary();
-      setBudget(updatedBudget);
-
-      setNewTripData({ destination: '', country: '', startDate: '', endDate: '', budget: '', tags: '' });
-      setIsModalOpen(false);
-      navigate(`/trips/${created.id}/builder`);
-    } catch (err) {
-      alert(err.message || 'Failed to create trip. Please try again.');
-    } finally {
-      setSubmittingTrip(false);
+  const handleDelete = async (id, e) => {
+    e.stopPropagation();
+    if (window.confirm('Are you sure you want to delete this trip?')) {
+      await deleteTrip(id);
+      setTrips(trips.filter(t => String(t.id) !== String(id)));
     }
   };
 
+  const handleDuplicate = async (id, e) => {
+    e.stopPropagation();
+    const cloned = await duplicateTrip(id);
+    setTrips([cloned, ...trips]);
+  };
+
+  // Metrics Calculations
+  const totalTripsCount = trips.length;
+  const totalPlannedCities = trips.reduce((sum, t) => sum + (t.stops ? t.stops.length : 0), 0);
+  const totalPlannedActivities = trips.reduce((sum, t) => {
+    const stopActs = (t.stops || []).reduce((sSum, s) => sSum + (s.activities ? s.activities.length : 0), 0);
+    return sum + stopActs;
+  }, 0);
+  const totalEstimatedBudget = trips.reduce((sum, t) => sum + (Number(t.budget) || 0), 0);
+
+  // Categorize trips by status
+  const upcomingTrips = trips.filter(t => t.status === 'Upcoming' || t.status === 'Ongoing');
+  const planningTrips = trips.filter(t => t.status === 'Planning');
+  const completedTrips = trips.filter(t => t.status === 'Completed');
+
+  const getStatusBadgeClass = (status) => {
+    if (status === 'Ongoing') return 'status-ongoing';
+    if (status === 'Upcoming') return 'status-upcoming';
+    if (status === 'Completed') return 'status-completed';
+    return 'status-planning';
+  };
+
   return (
-    <div className="dashboard-page">
-      <Navbar user={currentUser || user} onLogout={onLogout} />
+    <div className="dashboard-layout">
+      <Navbar activeTab="dashboard" />
 
       <main className="dashboard-content">
-        <div className="container">
-          {/* Welcome Banner */}
-          <div className="welcome-banner">
-            <div className="welcome-banner-content">
-              <span className="welcome-tag">
-                <Sparkles size={14} /> Explorer Pass Active
-              </span>
-              <h1 className="welcome-title">
-                Welcome back, {currentUser?.name ? currentUser.name.split(' ')[0] : 'Explorer'}!
-              </h1>
-              <p className="welcome-subtitle">
-                Ready for your next adventure? You have {trips.length} upcoming {trips.length === 1 ? 'trip' : 'trips'} planned.
-              </p>
-              <div className="welcome-actions">
-                <Button
-                  variant="secondary"
-                  size="md"
-                  icon={<Plus size={18} />}
-                  onClick={() => navigate('/trips/create')}
-                >
-                  Plan New Trip
-                </Button>
-              </div>
-            </div>
+        {/* Welcome Banner */}
+        <section className="welcome-banner" style={{ background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 50%, #1e40af 100%)', color: '#fff', padding: '2rem 2.5rem', borderRadius: 'var(--radius-xl)', marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxShadow: 'var(--shadow-lg)' }}>
+          <div>
+            <h1 style={{ margin: 0, fontSize: '1.85rem', fontWeight: 800 }}>
+              Welcome back, {user ? user.name : 'Traveler'}! 👋
+            </h1>
+            <p style={{ margin: '0.4rem 0 0', opacity: 0.9, fontSize: '0.95rem' }}>
+              Your global itinerary planner is active. Explore destinations, optimize budgets, and plan seamless adventures.
+            </p>
+          </div>
+          <Button
+            variant="secondary"
+            size="lg"
+            icon={<Plus size={18} />}
+            onClick={() => navigate('/trips/create')}
+            style={{ backgroundColor: '#fff', color: 'var(--primary)', fontWeight: 700 }}
+          >
+            Plan New Trip
+          </Button>
+        </section>
+
+        {/* Real User Metrics Counters */}
+        <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
+          <div style={{ padding: '1.25rem', backgroundColor: 'var(--surface)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+            <div style={{ fontSize: '0.825rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Total Trips</div>
+            <div style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--primary)', marginTop: '4px' }}>{totalTripsCount}</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>Active & saved itineraries</div>
           </div>
 
-          {/* Main Dashboard Layout Grid */}
-          <div className="dashboard-grid">
-            <div className="dashboard-main">
-              {/* Upcoming Trips Section */}
-              <section id="upcoming-trips" className="dashboard-section">
-                <div className="section-header">
-                  <h2 className="section-title">
-                    <MapPin className="section-title-icon" size={22} />
-                    Upcoming Trips
-                  </h2>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    icon={<Plus size={16} />}
-                    onClick={() => navigate('/trips/create')}
+          <div style={{ padding: '1.25rem', backgroundColor: 'var(--surface)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+            <div style={{ fontSize: '0.825rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Planned Cities</div>
+            <div style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--accent)', marginTop: '4px' }}>{totalPlannedCities}</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>Destinations in route</div>
+          </div>
+
+          <div style={{ padding: '1.25rem', backgroundColor: 'var(--surface)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+            <div style={{ fontSize: '0.825rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Scheduled Activities</div>
+            <div style={{ fontSize: '1.85rem', fontWeight: 800, color: '#10b981', marginTop: '4px' }}>{totalPlannedActivities}</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>Tours & attractions</div>
+          </div>
+
+          <div style={{ padding: '1.25rem', backgroundColor: 'var(--surface)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
+            <div style={{ fontSize: '0.825rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>Total Estimated Budget</div>
+            <div style={{ fontSize: '1.85rem', fontWeight: 800, color: 'var(--text-main)', marginTop: '4px' }}>${totalEstimatedBudget.toLocaleString()}</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>Combined trip target</div>
+          </div>
+        </section>
+
+        {/* Upcoming & Active Trips */}
+        <section style={{ marginBottom: '2.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+            <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Compass size={22} color="var(--primary)" /> Upcoming & Active Adventures
+            </h2>
+            <Link to="/trips" style={{ color: 'var(--primary)', fontWeight: 700, fontSize: '0.9rem', textDecoration: 'none' }}>
+              View All Trips →
+            </Link>
+          </div>
+
+          {loading ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>Loading trips...</div>
+          ) : upcomingTrips.length > 0 || planningTrips.length > 0 ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.5rem' }}>
+              {[...upcomingTrips, ...planningTrips].slice(0, 6).map((trip) => {
+                const cityCount = trip.stops ? trip.stops.length : 0;
+                const actCount = (trip.stops || []).reduce((sum, s) => sum + (s.activities ? s.activities.length : 0), 0);
+
+                return (
+                  <div
+                    key={trip.id}
+                    onClick={() => navigate(`/trips/${trip.id}`)}
+                    style={{
+                      backgroundColor: 'var(--surface)',
+                      borderRadius: 'var(--radius-xl)',
+                      border: '1px solid var(--border)',
+                      overflow: 'hidden',
+                      boxShadow: 'var(--shadow-sm)',
+                      cursor: 'pointer',
+                      transition: 'transform 0.2s, box-shadow 0.2s'
+                    }}
                   >
-                    New Trip
-                  </Button>
-                </div>
-
-                {loading ? (
-                  <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                    Loading your itineraries...
-                  </div>
-                ) : trips.length > 0 ? (
-                  <div className="trips-grid">
-                    {trips.map((trip) => (
-                      <Card
-                        key={trip.id}
-                        image={trip.coverImage}
-                        badge={trip.status}
-                        title={trip.name || trip.destination}
-                        footer={
-                          <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-                              Budget: ${trip.budget}
-                            </span>
-                            <Button variant="text" size="sm" onClick={() => navigate(`/trips/${trip.id}`)}>
-                              View Details
-                            </Button>
-                          </div>
-                        }
-                      >
-                        <div className="trip-meta">
-                          <div className="trip-meta-item">
-                            <Calendar size={14} />
-                            <span>{trip.startDate} ({trip.durationDays} days)</span>
-                          </div>
-                        </div>
-
-                        {trip.tags && trip.tags.length > 0 && (
-                          <div className="trip-tags">
-                            {trip.tags.map((tag, idx) => (
-                              <span key={idx} className="tag-badge">
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </Card>
-                    ))}
-                  </div>
-                ) : (
-                  /* Empty State */
-                  <div className="empty-state">
-                    <div className="empty-state-icon">
-                      <FolderX size={32} />
+                    <div style={{ height: '160px', width: '100%', position: 'relative', overflow: 'hidden' }}>
+                      <img
+                        src={trip.coverImage || 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=800&q=80'}
+                        alt={trip.name}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      />
+                      <span style={{ position: 'absolute', top: '12px', right: '12px', padding: '4px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 800, backgroundColor: 'rgba(255,255,255,0.95)', color: 'var(--text-main)', boxShadow: 'var(--shadow-sm)' }}>
+                        {trip.status}
+                      </span>
                     </div>
-                    <h3 className="empty-state-title">No Trips Scheduled Yet</h3>
-                    <p className="empty-state-text">
-                      You haven't planned any trips yet. Start mapping out your dream destination or discover recommended spots below!
-                    </p>
-                    <Button
-                      variant="primary"
-                      icon={<Plus size={18} />}
-                      onClick={() => setIsModalOpen(true)}
-                    >
-                      Create Your First Trip
-                    </Button>
-                  </div>
-                )}
-              </section>
 
-              {/* Recommended Destinations Section */}
-              <section id="recommendations" className="dashboard-section">
-                <div className="section-header">
-                  <h2 className="section-title">
-                    <Compass className="section-title-icon" size={22} />
-                    Recommended Destinations
-                  </h2>
-                </div>
+                    <div style={{ padding: '1.25rem' }}>
+                      <h3 style={{ margin: '0 0 0.4rem', fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                        {trip.name}
+                      </h3>
+                      <div style={{ fontSize: '0.825rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.75rem' }}>
+                        <Calendar size={14} /> {trip.startDate} ➔ {trip.endDate}
+                      </div>
 
-                <div className="recommendations-grid">
-                  {recommendations.map((rec) => (
-                    <Card
-                      key={rec.id}
-                      image={rec.image}
-                      badge={rec.category}
-                      title={rec.title}
-                      footer={
-                        <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span className="rec-card-price">${rec.estimatedCost}</span>
-                          <Button variant="outline" size="sm">
-                            Explore
-                          </Button>
-                        </div>
-                      }
-                    >
-                      <div className="trip-meta">
-                        <div className="trip-meta-item">
-                          <MapPin size={14} />
-                          <span>{rec.location}</span>
-                        </div>
-                        <div className="trip-meta-item" style={{ color: '#F59E0B' }}>
-                          <Star size={14} fill="#F59E0B" />
-                          <span>{rec.rating} ({rec.reviewsCount})</span>
+                      <div style={{ display: 'flex', gap: '1rem', fontSize: '0.85rem', color: 'var(--text-main)', padding: '0.6rem 0', borderTop: '1px solid var(--border)', borderBottom: '1px solid var(--border)', marginBottom: '1rem' }}>
+                        <span>📍 <strong>{cityCount}</strong> Cities</span>
+                        <span>🎯 <strong>{actCount}</strong> Activities</span>
+                        <span>💵 <strong>${trip.budget}</strong></span>
+                      </div>
+
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Button variant="primary" size="sm" icon={<Eye size={14} />} onClick={(e) => { e.stopPropagation(); navigate(`/trips/${trip.id}`); }}>
+                          View Itinerary
+                        </Button>
+                        <div style={{ display: 'flex', gap: '0.4rem' }}>
+                          <button onClick={(e) => handleDuplicate(trip.id, e)} title="Duplicate Trip" style={{ background: 'var(--neutral-bg)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px', cursor: 'pointer' }}>
+                            <Copy size={15} />
+                          </button>
+                          <button onClick={(e) => handleDelete(trip.id, e)} title="Delete Trip" style={{ background: 'var(--neutral-bg)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px', color: 'var(--danger)', cursor: 'pointer' }}>
+                            <Trash2 size={15} />
+                          </button>
                         </div>
                       </div>
-                    </Card>
-                  ))}
-                </div>
-              </section>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
+          ) : (
+            <div style={{ padding: '3rem', textAlign: 'center', backgroundColor: 'var(--surface)', borderRadius: 'var(--radius-xl)', border: '1px dashed var(--border)' }}>
+              <Compass size={40} color="var(--primary)" style={{ opacity: 0.5, marginBottom: '0.5rem' }} />
+              <h3>No upcoming trips found</h3>
+              <p style={{ color: 'var(--text-muted)' }}>Start by creating your first custom itinerary.</p>
+              <Button variant="primary" onClick={() => navigate('/trips/create')}>Create a Trip</Button>
+            </div>
+          )}
+        </section>
 
-            {/* Sidebar Widgets */}
-            <aside className="dashboard-sidebar">
-              {/* Budget Summary Widget */}
-              <div id="budget" className="budget-widget">
-                <div className="budget-header">
-                  <h3 className="budget-title">
-                    <DollarSign size={20} color="var(--primary)" />
-                    Budget Overview
+        {/* Smart Recommendations Section */}
+        <section style={{ marginBottom: '2.5rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+            <div>
+              <h2 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--text-main)', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Sparkles size={22} color="var(--accent)" /> Smart Recommended Destinations
+              </h2>
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                Deterministic recommendation score based on budget, travel style, and popularity.
+              </span>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: '1.25rem' }}>
+            {recommendations.map((rec) => (
+              <div key={rec.id} style={{ backgroundColor: 'var(--surface)', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', overflow: 'hidden', padding: '1rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--primary)', backgroundColor: 'var(--primary-light)', padding: '2px 8px', borderRadius: '10px' }}>
+                      {rec.matchScore}% Match
+                    </span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>★ 4.8</span>
+                  </div>
+
+                  <h3 style={{ margin: '0 0 0.2rem', fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                    {rec.title}
                   </h3>
-                  <span className="tag-badge" style={{ backgroundColor: 'var(--success-light)', color: 'var(--success)' }}>
-                    Active Track
-                  </span>
-                </div>
-
-                <div className="budget-total">
-                  {budget.currency}{budget.totalBudget.toLocaleString()}
-                </div>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '0.85rem' }}>
-                  Total Planned Budget across all trips
-                </div>
-
-                <div className="budget-progress-bar">
-                  <div
-                    className="budget-progress-fill"
-                    style={{
-                      width: `${budget.totalBudget > 0 ? Math.min(100, (budget.totalSpent / budget.totalBudget) * 100) : 0}%`
-                    }}
-                  />
-                </div>
-
-                <div className="budget-stats">
-                  <div>
-                    <div className="budget-stat-label">Spent</div>
-                    <div className="budget-stat-value" style={{ color: 'var(--accent)' }}>
-                      {budget.currency}{budget.totalSpent.toLocaleString()}
-                    </div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                    📍 {rec.location}
                   </div>
-                  <div>
-                    <div className="budget-stat-label">Remaining</div>
-                    <div className="budget-stat-value">
-                      {budget.currency}{budget.remaining.toLocaleString()}
-                    </div>
+
+                  <div style={{ background: 'var(--neutral-bg)', padding: '0.6rem 0.75rem', borderRadius: 'var(--radius-md)', fontSize: '0.75rem', color: 'var(--text-main)', marginBottom: '1rem' }}>
+                    <div style={{ fontWeight: 700, marginBottom: '3px', color: 'var(--primary)' }}>Why Recommended:</div>
+                    {(rec.whyRecommended || []).map((reason, rIdx) => (
+                      <div key={rIdx} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '2px' }}>
+                        ✓ {reason}
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
 
-              {/* Travel Insight Card */}
-              <div
-                className="card"
-                style={{ marginTop: '1.5rem', padding: '1.5rem', background: 'linear-gradient(180deg, #F8FAFC 0%, #EBF3FA 100%)' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: 'var(--primary)', fontWeight: 700 }}>
-                  <TrendingUp size={18} />
-                  <span>Travel Smart Tip</span>
-                </div>
-                <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                  Booking flights 6 to 8 weeks in advance for domestic travel and 3 to 4 months for international trips yields average savings of up to 24%.
-                </p>
+                <Button variant="outline" size="sm" onClick={() => navigate('/cities')}>
+                  Explore City
+                </Button>
               </div>
-            </aside>
+            ))}
           </div>
-        </div>
+        </section>
       </main>
-
-      {/* Plan New Trip Modal */}
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title="Plan New Trip"
-        maxWidth="580px"
-      >
-        <form onSubmit={handleCreateTripSubmit}>
-          <Input
-            label="Destination Name"
-            name="destination"
-            value={newTripData.destination}
-            onChange={(e) => setNewTripData({ ...newTripData, destination: e.target.value })}
-            placeholder="e.g. Paris & Normandy"
-            required
-          />
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <Input
-              label="Country"
-              name="country"
-              value={newTripData.country}
-              onChange={(e) => setNewTripData({ ...newTripData, country: e.target.value })}
-              placeholder="e.g. France"
-            />
-            <Input
-              label="Estimated Budget ($)"
-              type="number"
-              name="budget"
-              value={newTripData.budget}
-              onChange={(e) => setNewTripData({ ...newTripData, budget: e.target.value })}
-              placeholder="e.g. 2500"
-            />
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-            <Input
-              label="Start Date"
-              type="date"
-              name="startDate"
-              value={newTripData.startDate}
-              onChange={(e) => setNewTripData({ ...newTripData, startDate: e.target.value })}
-            />
-            <Input
-              label="End Date"
-              type="date"
-              name="endDate"
-              value={newTripData.endDate}
-              onChange={(e) => setNewTripData({ ...newTripData, endDate: e.target.value })}
-            />
-          </div>
-
-          <Input
-            label="Tags / Interests (comma separated)"
-            name="tags"
-            value={newTripData.tags}
-            onChange={(e) => setNewTripData({ ...newTripData, tags: e.target.value })}
-            placeholder="e.g. Food, Museums, Architecture"
-          />
-
-          <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', marginTop: '1.5rem' }}>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsModalOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              loading={submittingTrip}
-              icon={<Plus size={18} />}
-            >
-              Create Trip
-            </Button>
-          </div>
-        </form>
-      </Modal>
     </div>
   );
 }

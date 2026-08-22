@@ -4,7 +4,7 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
-// Initialize DB connection & schema
+// Initialize DB connection, schema & migrations
 require('./database');
 
 const authRoutes = require('./routes/auth');
@@ -12,6 +12,9 @@ const tripRoutes = require('./routes/trips');
 const stopRoutes = require('./routes/stops');
 const activityRoutes = require('./routes/activities');
 const cityRoutes = require('./routes/cities');
+const expenseRoutes = require('./routes/expenses');
+const shareRoutes = require('./routes/share');
+const profileRoutes = require('./routes/profile');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -28,12 +31,15 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Register API Routes
+// Register API Routers
 app.use('/api/auth', authRoutes);
 app.use('/api/trips', tripRoutes);
 app.use('/api/stops', stopRoutes);
 app.use('/api/activities', activityRoutes);
 app.use('/api/cities', cityRoutes);
+app.use('/api/expenses', expenseRoutes);
+app.use('/api/shared', shareRoutes);
+app.use('/api/profile', profileRoutes);
 
 // 404 Handler
 app.use((req, res, next) => {

@@ -14,7 +14,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
   }
 });
 
-function initDatabase() {
+async function initDatabase() {
   db.run('PRAGMA foreign_keys = ON;', (err) => {
     if (err) {
       console.error('Failed to enable foreign keys:', err.message);
@@ -23,15 +23,46 @@ function initDatabase() {
 
   if (fs.existsSync(schemaPath)) {
     const schemaSql = fs.readFileSync(schemaPath, 'utf8');
-    db.exec(schemaSql, (err) => {
+    db.exec(schemaSql, async (err) => {
       if (err) {
         console.error('Error initializing database schema:', err.message);
       } else {
         console.log('Database schema initialized successfully.');
+        await runMigrationsAsync();
         seedInitialData();
       }
     });
   }
+}
+
+function runMigrationsAsync() {
+  return new Promise((resolve) => {
+    const addColumnIfMissing = (table, column, type) => {
+      return new Promise((resCol) => {
+        db.all(`PRAGMA table_info(${table});`, [], (err, rows) => {
+          if (err || !rows) return resCol();
+          const exists = rows.some(r => r.name === column);
+          if (!exists) {
+            db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${type};`, (alterErr) => {
+              if (alterErr) console.error(`Migration error adding ${column} to ${table}:`, alterErr.message);
+              else console.log(`Migrated: Added ${column} to ${table}`);
+              resCol();
+            });
+          } else {
+            resCol();
+          }
+        });
+      });
+    };
+
+    Promise.all([
+      addColumnIfMissing('users', 'avatar', 'TEXT'),
+      addColumnIfMissing('users', 'preferred_currency', "TEXT DEFAULT 'USD'"),
+      addColumnIfMissing('trips', 'budget', 'REAL DEFAULT 0'),
+      addColumnIfMissing('trips', 'share_id', 'TEXT UNIQUE'),
+      addColumnIfMissing('trips', 'is_public', 'INTEGER DEFAULT 0')
+    ]).then(resolve);
+  });
 }
 
 function seedInitialData() {
@@ -77,7 +108,6 @@ function seedActivities() {
       return;
     }
 
-    // Get city IDs to link activities
     db.all('SELECT id, name FROM cities', [], (err, cities) => {
       if (err || !cities) return;
 

@@ -5,6 +5,8 @@ CREATE TABLE IF NOT EXISTS users (
   name TEXT NOT NULL,
   email TEXT NOT NULL UNIQUE,
   password TEXT NOT NULL,
+  avatar TEXT,
+  preferred_currency TEXT DEFAULT 'USD',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -26,7 +28,10 @@ CREATE TABLE IF NOT EXISTS trips (
   description TEXT,
   start_date TEXT,
   end_date TEXT,
+  budget REAL DEFAULT 0,
   cover_image TEXT,
+  share_id TEXT UNIQUE,
+  is_public INTEGER DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );

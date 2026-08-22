@@ -16,41 +16,83 @@ const calculateBudgetLogic = async (tripId, trip, userId = null) => {
       throw new Error('Unauthorized: You do not own this trip');
     }
 
-    const expenses = await dbAll('SELECT category, amount FROM expenses WHERE trip_id = ?', [tripId]);
+    const stops = await dbAll('SELECT * FROM stops WHERE trip_id = ? ORDER BY position ASC', [tripId]);
+    const expenses = await dbAll('SELECT * FROM expenses WHERE trip_id = ?', [tripId]);
     const tripActivities = await dbAll('SELECT cost FROM trip_activities WHERE trip_id = ?', [tripId]);
+    const transportSegments = await dbAll('SELECT * FROM transport_segments WHERE trip_id = ?', [tripId]);
 
-    let transport = 0;
-    let stay = 0;
-    let activities = 0;
-    let meals = 0;
+    let durationDays = calculateDurationDays(trip.start_date, trip.end_date);
+    if (stops.length > 0) {
+      let calculatedDays = 0;
+      stops.forEach(s => {
+        if (s.start_date && s.end_date) {
+          const d1 = new Date(s.start_date);
+          const d2 = new Date(s.end_date);
+          if (!isNaN(d1.getTime()) && !isNaN(d2.getTime())) {
+            calculatedDays += Math.max(1, Math.ceil(Math.abs(d2 - d1) / (1000 * 60 * 60 * 24)) + 1);
+          } else {
+            calculatedDays += 1;
+          }
+        } else {
+          calculatedDays += 1;
+        }
+      });
+      if (calculatedDays > 0) durationDays = calculatedDays;
+    }
+
+    const transportCost = transportSegments.length > 0
+      ? transportSegments.reduce((sum, t) => sum + Number(t.cost || 0), 0)
+      : (300 + Math.max(0, stops.length - 1) * 120);
+
+    const stayCost = durationDays * 95;
+    const mealCost = durationDays * 45;
+
+    const activityCost = tripActivities.reduce((sum, ta) => sum + (Number(ta.cost) || 0), 0);
+
+    const totalEstimated = transportCost + stayCost + activityCost + mealCost;
+    const actualExpenses = expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+
+    const effectiveSpending = actualExpenses > 0 ? actualExpenses : totalEstimated;
+    const userBudget = Number(trip.budget) || 2500;
+    const remainingBudget = userBudget - effectiveSpending;
+    const percentageUsed = userBudget > 0 ? Number(((effectiveSpending / userBudget) * 100).toFixed(1)) : 0;
+    const isOverBudget = effectiveSpending > userBudget;
+    const avgDailyCost = Number((effectiveSpending / Math.max(1, durationDays)).toFixed(2));
+
+    const categoryTotals = {
+      Transport: transportCost,
+      Accommodation: stayCost,
+      Activities: activityCost,
+      Meals: mealCost,
+      Miscellaneous: 0
+    };
 
     expenses.forEach(e => {
-      const cat = (e.category || '').toLowerCase();
-      const amt = Number(e.amount) || 0;
-      if (cat === 'transport') transport += amt;
-      else if (cat === 'stay' || cat === 'accommodation') stay += amt;
-      else if (cat === 'activity' || cat === 'activities') activities += amt;
-      else if (cat === 'meal' || cat === 'meals' || cat === 'food') meals += amt;
-      else activities += amt;
+      const cat = e.category || 'Miscellaneous';
+      let normalizedCat = 'Miscellaneous';
+      if (cat.toLowerCase() === 'transport') normalizedCat = 'Transport';
+      else if (cat.toLowerCase() === 'accommodation' || cat.toLowerCase() === 'stay') normalizedCat = 'Accommodation';
+      else if (cat.toLowerCase() === 'activities' || cat.toLowerCase() === 'activity') normalizedCat = 'Activities';
+      else if (cat.toLowerCase() === 'meals' || cat.toLowerCase() === 'meal' || cat.toLowerCase() === 'food') normalizedCat = 'Meals';
+      categoryTotals[normalizedCat] = (categoryTotals[normalizedCat] || 0) + Number(e.amount || 0);
     });
-
-    tripActivities.forEach(ta => {
-      activities += Number(ta.cost) || 0;
-    });
-
-    const total = transport + stay + activities + meals;
-    const durationDays = calculateDurationDays(trip.start_date, trip.end_date);
-    const averagePerDay = Math.round((total / durationDays) * 100) / 100;
-    const overBudget = trip.budget > 0 ? total > trip.budget : false;
 
     return {
-      transport,
-      stay,
-      activities,
-      meals,
-      total,
-      averagePerDay,
-      overBudget
+      transport: transportCost,
+      stay: stayCost,
+      activities: activityCost,
+      meals: mealCost,
+      misc: categoryTotals.Miscellaneous || 0,
+      totalEstimated,
+      actualExpenses,
+      effectiveSpending,
+      userBudget,
+      remainingBudget,
+      percentageUsed,
+      isOverBudget,
+      avgDailyCost,
+      durationDays,
+      categoryTotals
     };
 };
 
@@ -189,99 +231,6 @@ const optimizeTripBudget = async (req, res, next) => {
   }
 };
 
-// GET /api/trips/:id/health
-const getTripHealth = async (req, res, next) => {
-  try {
-    const userId = req.user ? req.user.id : null;
-    const { id: tripId } = req.params;
-
-    const trip = await dbGet('SELECT * FROM trips WHERE id = ?', [tripId]);
-    if (!trip) return res.status(404).json({ success: false, message: 'Trip not found', data: null });
-
-    if (userId && trip.user_id !== userId) {
-      return res.status(403).json({ success: false, message: 'Unauthorized', data: null });
-    }
-
-    const stops = await dbAll('SELECT * FROM stops WHERE trip_id = ? ORDER BY start_date ASC', [tripId]);
-    const activities = await dbAll('SELECT * FROM trip_activities WHERE trip_id = ?', [tripId]);
-    
-    let budgetData;
-    try {
-      budgetData = await calculateBudgetLogic(tripId, trip, userId);
-    } catch (e) {
-      budgetData = { overBudget: false, total: 0, effectiveSpending: 0, userBudget: 0, remainingBudget: 0 };
-    }
-
-    let score = 100;
-    const deductions = [];
-    const conflicts = [];
-
-    // Validation 1: Date overlaps and invalid dates
-    stops.forEach((stop, idx) => {
-      if (trip.start_date && stop.start_date < trip.start_date) {
-        conflicts.push(`Stop "${stop.city}" starts before the trip begins.`);
-      }
-      if (trip.end_date && stop.end_date > trip.end_date) {
-        conflicts.push(`Stop "${stop.city}" ends after the trip ends.`);
-      }
-      if (stop.start_date > stop.end_date) {
-        conflicts.push(`Stop "${stop.city}" end date is earlier than start date.`);
-      }
-      if (idx > 0) {
-        const prevStop = stops[idx - 1];
-        if (stop.start_date < prevStop.end_date) {
-          conflicts.push(`Stop "${stop.city}" overlaps with previous stop "${prevStop.city}".`);
-        }
-      }
-    });
-
-    // Validation 2: Missing activities
-    if (stops.length === 0) {
-      score -= 20;
-      deductions.push('No destination cities/stops added yet.');
-    } else {
-      const emptyStops = stops.filter(s => {
-        const stopActs = activities.filter(a => a.stop_id === s.id);
-        return stopActs.length === 0;
-      });
-      if (emptyStops.length > 0) {
-        score -= 10;
-        deductions.push(`${emptyStops.length} stop(s) have no planned activities.`);
-      }
-    }
-
-    // Validation 3: Budget overflow
-    if (trip.budget > 0 && budgetData.total > trip.budget) {
-      score -= 15;
-      deductions.push(`Trip estimated cost exceeds budget by ${budgetData.total - trip.budget}.`);
-      conflicts.push(`Trip estimated cost exceeds target budget.`);
-    }
-
-    if (conflicts.length > 0) {
-      score -= Math.min(40, conflicts.length * 10);
-      deductions.push(`${conflicts.length} itinerary conflict(s) or date overlaps detected.`);
-    }
-
-    if (!trip.cover_image) {
-      score -= 5;
-      deductions.push('Missing cover image photo.');
-    }
-
-    score = Math.max(0, Math.min(100, score));
-
-    let status = 'Excellent';
-    if (score < 50) status = 'Needs Attention';
-    else if (score < 80) status = 'Good';
-
-    return res.status(200).json({
-      success: true,
-      message: 'Trip health calculated',
-      data: { score, status, deductions, conflicts }
-    });
-  } catch (error) {
-    next(error);
-  }
-};
 
 // GET /api/trips/:id/timeline
 const getTripTimeline = async (req, res, next) => {
@@ -382,7 +331,7 @@ const getTripTimeline = async (req, res, next) => {
 
 module.exports = {
   getTripBudget,
-  getTripHealth,
   getTripTimeline,
-  optimizeTripBudget
+  optimizeTripBudget,
+  calculateBudgetLogic
 };

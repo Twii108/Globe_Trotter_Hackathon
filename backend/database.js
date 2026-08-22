@@ -69,11 +69,14 @@ function runMigrationsAsync() {
       addColumnIfMissing('users', 'preferred_currency', "TEXT DEFAULT 'USD'"),
       addColumnIfMissing('users', 'travel_style', "TEXT DEFAULT 'Balanced Explorer'"),
       addColumnIfMissing('trips', 'budget', 'REAL DEFAULT 0'),
+      addColumnIfMissing('trips', 'budget_allocations', 'TEXT'),
       addColumnIfMissing('trips', 'share_id', 'TEXT'),
       addColumnIfMissing('trips', 'is_public', 'INTEGER DEFAULT 0'),
       addColumnIfMissing('trips', 'updated_at', 'DATETIME'),
       addColumnIfMissing('expenses', 'expense_date', 'TEXT'),
       addColumnIfMissing('trip_activities', 'position', 'INTEGER DEFAULT 0'),
+      addColumnIfMissing('cities', 'lat', 'REAL'),
+      addColumnIfMissing('cities', 'lng', 'REAL'),
       createTableIfMissing(`
         CREATE TABLE IF NOT EXISTS transport_segments (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -98,7 +101,28 @@ function runMigrationsAsync() {
           FOREIGN KEY (city_id) REFERENCES cities(id) ON DELETE CASCADE
         );
       `)
-    ]).then(resolve);
+    ]).then(async () => {
+      try {
+        await dbRun("UPDATE cities SET lat = 48.8566, lng = 2.3522 WHERE name = 'Paris' AND lat IS NULL");
+        await dbRun("UPDATE cities SET lat = 35.0116, lng = 135.7681 WHERE name = 'Kyoto' AND lat IS NULL");
+        await dbRun("UPDATE cities SET lat = 40.7128, lng = -74.0060 WHERE name = 'New York City' AND lat IS NULL");
+        await dbRun("UPDATE cities SET lat = -8.4095, lng = 115.1889 WHERE name = 'Bali' AND lat IS NULL");
+        await dbRun("UPDATE cities SET lat = 41.9028, lng = 12.4964 WHERE name = 'Rome' AND lat IS NULL");
+        await dbRun("UPDATE cities SET lat = -33.9249, lng = 18.4241 WHERE name = 'Cape Town' AND lat IS NULL");
+        await dbRun("UPDATE cities SET lat = -22.9068, lng = -43.1729 WHERE name = 'Rio de Janeiro' AND lat IS NULL");
+        await dbRun("UPDATE cities SET lat = -33.8688, lng = 151.2093 WHERE name = 'Sydney' AND lat IS NULL");
+        await dbRun("UPDATE cities SET lat = 25.2048, lng = 55.2708 WHERE name = 'Dubai' AND lat IS NULL");
+        await dbRun("UPDATE cities SET lat = -13.1631, lng = -72.5450 WHERE name = 'Machu Picchu' AND lat IS NULL");
+        await dbRun("UPDATE cities SET lat = 36.3932, lng = 25.4615 WHERE name = 'Santorini' AND lat IS NULL");
+        await dbRun("UPDATE cities SET lat = 13.7563, lng = 100.5018 WHERE name = 'Bangkok' AND lat IS NULL");
+        await dbRun("UPDATE cities SET lat = 51.5074, lng = -0.1278 WHERE name = 'London' AND lat IS NULL");
+        await dbRun("UPDATE cities SET lat = 41.0082, lng = 28.9784 WHERE name = 'Istanbul' AND lat IS NULL");
+        await dbRun("UPDATE cities SET lat = 51.1784, lng = -115.5708 WHERE name = 'Banff' AND lat IS NULL");
+      } catch (err) {
+        console.error("Backfilling coordinates failed:", err.message);
+      }
+      resolve();
+    });
   });
 }
 
@@ -111,26 +135,26 @@ function seedInitialData() {
     console.log('Seeding initial cities and activities data...');
 
     const citiesData = [
-      { name: 'Paris', country: 'France', region: 'Europe', cost_index: 8, popularity: 95, description: 'The City of Light, famous for its cafe culture and the Eiffel Tower.' },
-      { name: 'Kyoto', country: 'Japan', region: 'Asia', cost_index: 7, popularity: 90, description: 'Former imperial capital known for classical Buddhist temples and gardens.' },
-      { name: 'New York City', country: 'USA', region: 'North America', cost_index: 9, popularity: 98, description: 'The Big Apple, a global hub of finance, culture, and entertainment.' },
-      { name: 'Bali', country: 'Indonesia', region: 'Asia', cost_index: 4, popularity: 92, description: 'Indonesian island known for its forested volcanic mountains and beaches.' },
-      { name: 'Rome', country: 'Italy', region: 'Europe', cost_index: 7, popularity: 94, description: 'Capital of Italy, known for nearly 3,000 years of globally influential art.' },
-      { name: 'Cape Town', country: 'South Africa', region: 'Africa', cost_index: 5, popularity: 85, description: 'A port city on South Africa\'s southwest coast, beneath Table Mountain.' },
-      { name: 'Rio de Janeiro', country: 'Brazil', region: 'South America', cost_index: 6, popularity: 88, description: 'Huge seaside city in Brazil, famed for its Copacabana and Ipanema beaches.' },
-      { name: 'Sydney', country: 'Australia', region: 'Oceania', cost_index: 8, popularity: 89, description: 'Capital of New South Wales, best known for its harbourfront Opera House.' },
-      { name: 'Dubai', country: 'UAE', region: 'Middle East', cost_index: 9, popularity: 91, description: 'City and emirate known for luxury shopping, ultramodern architecture.' },
-      { name: 'Machu Picchu', country: 'Peru', region: 'South America', cost_index: 5, popularity: 87, description: 'Incan citadel set high in the Andes Mountains in Peru.' },
-      { name: 'Santorini', country: 'Greece', region: 'Europe', cost_index: 7, popularity: 89, description: 'One of the Cyclades islands in the Aegean Sea, known for white cubiform houses.' },
-      { name: 'Bangkok', country: 'Thailand', region: 'Asia', cost_index: 4, popularity: 93, description: 'Thailand\'s capital, known for ornate shrines and vibrant street life.' },
-      { name: 'London', country: 'UK', region: 'Europe', cost_index: 9, popularity: 96, description: 'Capital of England and the UK, a 21st-century city with history.' },
-      { name: 'Istanbul', country: 'Turkey', region: 'Europe/Asia', cost_index: 5, popularity: 86, description: 'A major city in Turkey that straddles Europe and Asia across the Bosphorus.' },
-      { name: 'Banff', country: 'Canada', region: 'North America', cost_index: 7, popularity: 84, description: 'A resort town and one of Canada\'s most popular tourist destinations.' }
+      { name: 'Paris', country: 'France', region: 'Europe', cost_index: 8, popularity: 95, description: 'The City of Light, famous for its cafe culture and the Eiffel Tower.', lat: 48.8566, lng: 2.3522 },
+      { name: 'Kyoto', country: 'Japan', region: 'Asia', cost_index: 7, popularity: 90, description: 'Former imperial capital known for classical Buddhist temples and gardens.', lat: 35.0116, lng: 135.7681 },
+      { name: 'New York City', country: 'USA', region: 'North America', cost_index: 9, popularity: 98, description: 'The Big Apple, a global hub of finance, culture, and entertainment.', lat: 40.7128, lng: -74.0060 },
+      { name: 'Bali', country: 'Indonesia', region: 'Asia', cost_index: 4, popularity: 92, description: 'Indonesian island known for its forested volcanic mountains and beaches.', lat: -8.4095, lng: 115.1889 },
+      { name: 'Rome', country: 'Italy', region: 'Europe', cost_index: 7, popularity: 94, description: 'Capital of Italy, known for nearly 3,000 years of globally influential art.', lat: 41.9028, lng: 12.4964 },
+      { name: 'Cape Town', country: 'South Africa', region: 'Africa', cost_index: 5, popularity: 85, description: 'A port city on South Africa\'s southwest coast, beneath Table Mountain.', lat: -33.9249, lng: 18.4241 },
+      { name: 'Rio de Janeiro', country: 'Brazil', region: 'South America', cost_index: 6, popularity: 88, description: 'Huge seaside city in Brazil, famed for its Copacabana and Ipanema beaches.', lat: -22.9068, lng: -43.1729 },
+      { name: 'Sydney', country: 'Australia', region: 'Oceania', cost_index: 8, popularity: 89, description: 'Capital of New South Wales, best known for its harbourfront Opera House.', lat: -33.8688, lng: 151.2093 },
+      { name: 'Dubai', country: 'UAE', region: 'Middle East', cost_index: 9, popularity: 91, description: 'City and emirate known for luxury shopping, ultramodern architecture.', lat: 25.2048, lng: 55.2708 },
+      { name: 'Machu Picchu', country: 'Peru', region: 'South America', cost_index: 5, popularity: 87, description: 'Incan citadel set high in the Andes Mountains in Peru.', lat: -13.1631, lng: -72.5450 },
+      { name: 'Santorini', country: 'Greece', region: 'Europe', cost_index: 7, popularity: 89, description: 'One of the Cyclades islands in the Aegean Sea, known for white cubiform houses.', lat: 36.3932, lng: 25.4615 },
+      { name: 'Bangkok', country: 'Thailand', region: 'Asia', cost_index: 4, popularity: 93, description: 'Thailand\'s capital, known for ornate shrines and vibrant street life.', lat: 13.7563, lng: 100.5018 },
+      { name: 'London', country: 'UK', region: 'Europe', cost_index: 9, popularity: 96, description: 'Capital of England and the UK, a 21st-century city with history.', lat: 51.5074, lng: -0.1278 },
+      { name: 'Istanbul', country: 'Turkey', region: 'Europe/Asia', cost_index: 5, popularity: 86, description: 'A major city in Turkey that straddles Europe and Asia across the Bosphorus.', lat: 41.0082, lng: 28.9784 },
+      { name: 'Banff', country: 'Canada', region: 'North America', cost_index: 7, popularity: 84, description: 'A resort town and one of Canada\'s most popular tourist destinations.', lat: 51.1784, lng: -115.5708 }
     ];
 
-    const stmt = db.prepare('INSERT INTO cities (name, country, region, cost_index, popularity, description) VALUES (?, ?, ?, ?, ?, ?)');
+    const stmt = db.prepare('INSERT INTO cities (name, country, region, cost_index, popularity, description, lat, lng) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
     citiesData.forEach((c) => {
-      stmt.run(c.name, c.country, c.region, c.cost_index, c.popularity, c.description);
+      stmt.run(c.name, c.country, c.region, c.cost_index, c.popularity, c.description, c.lat, c.lng);
     });
     stmt.finalize(() => {
       console.log('Seeded 15 initial cities.');

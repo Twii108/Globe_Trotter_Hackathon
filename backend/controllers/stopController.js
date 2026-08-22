@@ -68,7 +68,13 @@ const createStop = async (req, res, next) => {
       [tripId, city_id || null, city || null, start_date || null, end_date || null, pos]
     );
 
-    const newStop = await dbGet('SELECT * FROM stops WHERE id = ?', [result.lastID]);
+    const newStop = await dbGet(
+      `SELECT s.*, c.lat, c.lng 
+       FROM stops s 
+       LEFT JOIN cities c ON s.city_id = c.id 
+       WHERE s.id = ?`,
+      [result.lastID]
+    );
 
     return res.status(201).json({
       success: true,
@@ -111,7 +117,14 @@ const getTripStops = async (req, res, next) => {
       });
     }
 
-    const stops = await dbAll('SELECT * FROM stops WHERE trip_id = ? ORDER BY position ASC', [tripId]);
+    const stops = await dbAll(
+      `SELECT s.*, c.lat, c.lng 
+       FROM stops s 
+       LEFT JOIN cities c ON s.city_id = c.id 
+       WHERE s.trip_id = ? 
+       ORDER BY s.position ASC`,
+      [tripId]
+    );
 
     return res.status(200).json({
       success: true,
@@ -190,7 +203,13 @@ const updateStop = async (req, res, next) => {
       [updatedCityId, updatedCity, updatedStartDate, updatedEndDate, updatedPosition, id]
     );
 
-    const updatedStop = await dbGet('SELECT * FROM stops WHERE id = ?', [id]);
+    const updatedStop = await dbGet(
+      `SELECT s.*, c.lat, c.lng 
+       FROM stops s 
+       LEFT JOIN cities c ON s.city_id = c.id 
+       WHERE s.id = ?`,
+      [id]
+    );
 
     return res.status(200).json({
       success: true,

@@ -23,10 +23,12 @@ const {
 
 const {
   getTripBudget,
-  getTripHealth,
   getTripTimeline,
   optimizeTripBudget
 } = require('../controllers/budgetTimelineController');
+
+const { getTripHealth } = require('../controllers/tripHealthController');
+const { getRecommendations } = require('../controllers/recommendationController');
 
 const {
   addExpense,
@@ -44,6 +46,9 @@ const {
 
 // All trip routes require authentication
 router.use(authMiddleware);
+
+// Trip Recommendations (Must be declared before nested parameter routes)
+router.get('/recommendations', getRecommendations);
 
 // Trip CRUD
 router.post('/', createTrip);

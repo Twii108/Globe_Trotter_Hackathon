@@ -46,7 +46,14 @@ const getUserTrips = async (req, res, next) => {
 
     // Attach stops for each trip
     for (let trip of trips) {
-      const stops = await dbAll('SELECT * FROM stops WHERE trip_id = ? ORDER BY position ASC', [trip.id]);
+      const stops = await dbAll(
+        `SELECT s.*, c.lat, c.lng 
+         FROM stops s 
+         LEFT JOIN cities c ON s.city_id = c.id 
+         WHERE s.trip_id = ? 
+         ORDER BY s.position ASC`,
+        [trip.id]
+      );
       const activities = await dbAll(
         `SELECT ta.*, a.name as activity_name, a.category, a.location 
          FROM trip_activities ta 
@@ -100,7 +107,14 @@ const getTripById = async (req, res, next) => {
       });
     }
 
-    const stops = await dbAll('SELECT * FROM stops WHERE trip_id = ? ORDER BY position ASC', [trip.id]);
+    const stops = await dbAll(
+      `SELECT s.*, c.lat, c.lng 
+       FROM stops s 
+       LEFT JOIN cities c ON s.city_id = c.id 
+       WHERE s.trip_id = ? 
+       ORDER BY s.position ASC`,
+      [trip.id]
+    );
     const activities = await dbAll(
       `SELECT ta.*, a.name as activity_name, a.category, a.location 
        FROM trip_activities ta 

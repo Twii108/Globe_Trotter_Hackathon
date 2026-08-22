@@ -2,7 +2,7 @@
 // Handles SQLite REST API Communication, Data Normalization, Central Budget Calculation,
 // Conflict Detection, Health Score Engine, and Smart Recommendations.
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:5000/api';
 const TOKEN_KEY = 'globetrotter_token';
 
 // JWT Storage
@@ -123,14 +123,7 @@ let localTripsStore = [
 ];
 
 let localSavedCities = ['1', '2', '5'];
-let currentUserSession = {
-  id: 'usr_101',
-  name: 'Alex Morgan',
-  email: 'alex.morgan@example.com',
-  avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80',
-  preferredCurrency: 'USD',
-  travelStyle: 'Balanced Explorer'
-};
+let currentUserSession = null;
 
 // --- DATA NORMALIZERS ---
 
@@ -176,6 +169,8 @@ export const normalizeStop = (stop) => {
     startDate: stop.start_date || stop.startDate || '',
     endDate: stop.end_date || stop.endDate || '',
     position: Number(stop.position) || 0,
+    lat: stop.lat !== undefined && stop.lat !== null ? Number(stop.lat) : null,
+    lng: stop.lng !== undefined && stop.lng !== null ? Number(stop.lng) : null,
     activities: Array.isArray(stop.activities) ? stop.activities.map(normalizeActivity) : []
   };
 };
@@ -346,232 +341,88 @@ export const calculateTripBudget = (trip, expenses = [], transportSegments = [])
   };
 };
 
-// --- TRIP CONFLICT & TIME DETECTOR ---
-export const detectTripConflicts = (trip, transportSegments = []) => {
-  const conflicts = [];
-  if (!trip) return conflicts;
-
-  const stops = trip.stops || [];
-  const tripStart = trip.startDate;
-  const tripEnd = trip.endDate;
-
-  // 1. Stop Date Validation
-  stops.forEach((stop, idx) => {
-    if (tripStart && stop.startDate < tripStart) {
-      conflicts.push(`Stop "${stop.city}" start date (${stop.startDate}) is before trip start date (${tripStart}).`);
-    }
-    if (tripEnd && stop.endDate > tripEnd) {
-      conflicts.push(`Stop "${stop.city}" end date (${stop.endDate}) is after trip end date (${tripEnd}).`);
-    }
-    if (stop.startDate > stop.endDate) {
-      conflicts.push(`Stop "${stop.city}" end date cannot be earlier than start date.`);
-    }
-
-    // Overlapping sequential stops
-    if (idx > 0) {
-      const prevStop = stops[idx - 1];
-      if (stop.startDate < prevStop.endDate) {
-        conflicts.push(`Stop "${stop.city}" overlaps with previous stop "${prevStop.city}".`);
-      }
-    }
-  });
-
-  // 2. Activity Conflict & Travel Time Check
-  stops.forEach(stop => {
-    const activities = stop.activities || [];
-    activities.forEach((act, aIdx) => {
-      // Date bounds
-      if (stop.startDate && act.date && act.date < stop.startDate) {
-        conflicts.push(`Activity "${act.name}" date (${act.date}) is before stop start date (${stop.startDate}).`);
-      }
-      if (stop.endDate && act.date && act.date > stop.endDate) {
-        conflicts.push(`Activity "${act.name}" date (${act.date}) is after stop end date (${stop.endDate}).`);
-      }
-
-      // Check consecutive activity time gaps
-      if (aIdx > 0) {
-        const prevAct = activities[aIdx - 1];
-        if (prevAct.date === act.date && prevAct.time && act.time) {
-          if (prevAct.time === act.time) {
-            conflicts.push(`⚠ Activity "${act.name}" overlaps with "${prevAct.name}" at ${act.time}.`);
-          }
-        }
-      }
-    });
-  });
-
-  // 3. Budget Overflow Check
-  const budgetInfo = calculateTripBudget(trip, [], transportSegments);
-  if (budgetInfo.isOverBudget) {
-    conflicts.push(`⚠ Trip estimated cost ($${budgetInfo.effectiveSpending}) exceeds target budget ($${budgetInfo.userBudget}) by $${Math.abs(budgetInfo.remainingBudget)}.`);
-  }
-
-  return conflicts;
-};
-
-// --- TRIP HEALTH SCORE ENGINE ---
-export const calculateTripHealthScore = (trip, transportSegments = []) => {
-  if (!trip) return { score: 100, status: 'Excellent', deductions: [] };
-
-  let score = 100;
-  const deductions = [];
-
-  const conflicts = detectTripConflicts(trip, transportSegments);
-  if (conflicts.length > 0) {
-    score -= Math.min(40, conflicts.length * 10);
-    deductions.push(`${conflicts.length} itinerary conflict(s) or date overlaps detected.`);
-  }
-
-  const stops = trip.stops || [];
-  if (stops.length === 0) {
-    score -= 20;
-    deductions.push('No destination cities/stops added yet.');
-  } else {
-    const emptyStops = stops.filter(s => !s.activities || s.activities.length === 0);
-    if (emptyStops.length > 0) {
-      score -= 10;
-      deductions.push(`${emptyStops.length} stop(s) have no planned activities.`);
-    }
-  }
-
-  const budgetInfo = calculateTripBudget(trip, [], transportSegments);
-  if (budgetInfo.isOverBudget) {
-    score -= 15;
-    deductions.push('Estimated trip total exceeds allocated budget.');
-  }
-
-  if (!trip.coverImage) {
-    score -= 5;
-    deductions.push('Missing cover image photo.');
-  }
-
-  score = Math.max(0, Math.min(100, score));
-
-  let status = 'Excellent';
-  if (score < 50) status = 'Needs Attention';
-  else if (score < 80) status = 'Good';
-
-  return { score, status, deductions };
-};
-
-// --- DETERMINISTIC SMART RECOMMENDATION ENGINE ---
-export const calculateRecommendationScore = async (user, city) => {
-  let score = 75; // base score
-  const whyRecommended = [];
-
-  // 1. Budget Match
-  let userBudget = 2500;
+// --- CENTRALIZED BACKEND-DRIVEN BUDGET & HEALTH ---
+export const getTripBudget = async (tripId) => {
   try {
-      const trips = await getTrips();
-      if (trips && trips.length > 0) {
-          const totalBudget = trips.reduce((sum, t) => sum + (Number(t.budget) || 0), 0);
-          const tripsWithBudget = trips.filter(t => Number(t.budget) > 0).length;
-          if (tripsWithBudget > 0) {
-              userBudget = totalBudget / tripsWithBudget;
-          }
-      }
-  } catch (err) {}
-  
-  const cityCost = (city.costIndex || 5) * (userBudget / 10);
-  if (cityCost <= userBudget) {
-    score += 10;
-    whyRecommended.push('Fits comfortably within your target budget');
+    const res = await apiRequest(`/trips/${tripId}/budget`, { method: 'GET' });
+    return res.data;
+  } catch (err) {
+    console.error(`Failed to fetch budget for trip ${tripId}:`, err);
+    throw err;
   }
-
-  // 2. Interest / Region Match
-  if (user?.travelStyle) {
-    if (user.travelStyle.includes('Culture') && (city.description?.includes('temple') || city.description?.includes('art') || city.region === 'Europe')) {
-      score += 10;
-      whyRecommended.push(`Matches your ${user.travelStyle} travel style`);
-    } else {
-      whyRecommended.push('Popular cultural & scenic highlights');
-    }
-  } else {
-    whyRecommended.push('Matches culture & sightseeing preferences');
-  }
-
-  // 3. Popularity Score
-  if ((city.popularity || 80) >= 90) {
-    score += 5;
-    whyRecommended.push('Top-rated global destination (90%+ rating)');
-  }
-
-  // 4. Duration Suitability
-  whyRecommended.push('Suitable for a 5 to 7-day vacation itinerary');
-
-  const finalScore = Math.min(99, Math.max(65, score));
-  return { matchScore: finalScore, whyRecommended };
 };
 
-// --- API METHOD EXPORTS WITH FALLBACK ---
+export const getTripHealth = async (tripId) => {
+  try {
+    const res = await apiRequest(`/trips/${tripId}/health`, { method: 'GET' });
+    return res.data;
+  } catch (err) {
+    console.error(`Failed to fetch health for trip ${tripId}:`, err);
+    throw err;
+  }
+};
+
+
 
 // AUTH
 export const authService = {
   async login(email, password) {
-    try {
-      const res = await apiRequest('/auth/login', { method: 'POST', body: { email, password }, requiresAuth: false });
-      if (res?.data?.token) setToken(res.data.token);
-      currentUserSession = normalizeUser(res?.data?.user) || currentUserSession;
-      return { user: currentUserSession, token: res?.data?.token };
-    } catch (err) {
-      if (!email || !password) throw new Error('Email and password required.');
-      currentUserSession = { ...currentUserSession, email };
-      return { user: currentUserSession, token: 'mock_jwt_token_123' };
-    }
+    if (!email || !password) throw new Error('Email and password required.');
+    const res = await apiRequest('/auth/login', { method: 'POST', body: { email, password }, requiresAuth: false });
+    if (res?.data?.token) setToken(res.data.token);
+    currentUserSession = normalizeUser(res?.data?.user);
+    return { user: currentUserSession, token: res?.data?.token };
   },
 
   async signup({ name, email, password }) {
-    try {
-      const res = await apiRequest('/auth/signup', { method: 'POST', body: { name, email, password }, requiresAuth: false });
-      if (res?.data?.token) setToken(res.data.token);
-      currentUserSession = normalizeUser(res?.data?.user) || currentUserSession;
-      return { user: currentUserSession, token: res?.data?.token };
-    } catch (err) {
-      if (!name || !email || !password) throw new Error('All fields required.');
-      currentUserSession = { id: `usr_${Date.now()}`, name, email, avatar: currentUserSession.avatar, preferredCurrency: 'USD' };
-      return { user: currentUserSession, token: 'mock_jwt_token_456' };
-    }
+    if (!name || !email || !password) throw new Error('All fields required.');
+    const res = await apiRequest('/auth/signup', { method: 'POST', body: { name, email, password }, requiresAuth: false });
+    if (res?.data?.token) setToken(res.data.token);
+    currentUserSession = normalizeUser(res?.data?.user);
+    return { user: currentUserSession, token: res?.data?.token };
   },
 
   async getCurrentUser() {
+    const token = getToken();
+    if (!token) {
+      currentUserSession = null;
+      return null;
+    }
     try {
       const res = await apiRequest('/auth/me', { method: 'GET', requiresAuth: true });
-      currentUserSession = normalizeUser(res?.data?.user) || currentUserSession;
+      currentUserSession = normalizeUser(res?.data?.user);
       return currentUserSession;
     } catch (err) {
-      return currentUserSession;
+      currentUserSession = null;
+      removeToken();
+      return null;
     }
   },
 
   async updateProfile(profileData) {
-    try {
-      const res = await apiRequest('/profile', {
-        method: 'PUT',
-        body: {
-          name: profileData.name,
-          avatar: profileData.avatar,
-          preferred_currency: profileData.preferredCurrency || profileData.preferred_currency,
-          travel_style: profileData.travelStyle || profileData.travel_style
-        }
-      });
-      currentUserSession = normalizeUser(res?.data?.user) || currentUserSession;
-      return currentUserSession;
-    } catch (err) {
-      currentUserSession = { ...currentUserSession, ...profileData };
-      return currentUserSession;
-    }
+    const res = await apiRequest('/profile', {
+      method: 'PUT',
+      body: {
+        name: profileData.name,
+        avatar: profileData.avatar,
+        preferred_currency: profileData.preferredCurrency || profileData.preferred_currency,
+        travel_style: profileData.travelStyle || profileData.travel_style
+      }
+    });
+    currentUserSession = normalizeUser(res?.data?.user);
+    return currentUserSession;
   },
 
   async deleteAccount() {
-    try {
-      await apiRequest('/profile', { method: 'DELETE' });
-    } catch (e) { }
+    await apiRequest('/profile', { method: 'DELETE' });
     removeToken();
+    currentUserSession = null;
     return true;
   },
 
   async logout() {
     removeToken();
+    currentUserSession = null;
     return true;
   }
 };
@@ -975,9 +826,6 @@ export const tripService = {
   getActivities,
   searchActivities,
   calculateTripBudget,
-  detectTripConflicts,
-  calculateTripHealthScore,
-  calculateRecommendationScore,
   toggleSaveCity,
   getSavedCities,
   getTransportSegments,
@@ -988,12 +836,33 @@ export const tripService = {
   toggleShareStatus,
   getSharedTrip,
   copySharedTrip,
+  getTripBudget,
+  getTripHealth,
 
   async getRecommendedDestinations() {
+    try {
+      const res = await apiRequest('/trips/recommendations', { method: 'GET' });
+      if (res && res.success && res.data) {
+        return res.data.map(c => ({
+          id: String(c.id),
+          title: c.name,
+          location: `${c.name}, ${c.country}`,
+          rating: 4.8,
+          reviewsCount: c.popularity * 3,
+          estimatedCost: (c.cost_index || c.costIndex || 5) * 250,
+          image: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=800&q=80',
+          category: c.region || 'Discovery',
+          matchScore: c.matchScore,
+          whyRecommended: c.whyRecommended
+        }));
+      }
+    } catch (err) {
+      console.error('Failed to fetch recommendations:', err);
+    }
+    // Fallback:
     const cities = await getCities();
     const recommendedCities = [];
     for (const c of cities.slice(0, 4)) {
-      const rec = await calculateRecommendationScore(currentUserSession, c);
       recommendedCities.push({
         id: c.id,
         title: c.name,
@@ -1003,8 +872,8 @@ export const tripService = {
         estimatedCost: c.costIndex * 250,
         image: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=800&q=80',
         category: c.region || 'Discovery',
-        matchScore: rec.matchScore,
-        whyRecommended: rec.whyRecommended
+        matchScore: 85,
+        whyRecommended: ['Fits comfortably within your target budget', 'Popular cultural & scenic highlights']
       });
     }
     return recommendedCities;
@@ -1042,9 +911,6 @@ export default {
   getActivities,
   searchActivities,
   calculateTripBudget,
-  detectTripConflicts,
-  calculateTripHealthScore,
-  calculateRecommendationScore,
   toggleSaveCity,
   getSavedCities,
   getTransportSegments,
@@ -1054,5 +920,9 @@ export default {
   addExpense,
   toggleShareStatus,
   getSharedTrip,
-  copySharedTrip
+  copySharedTrip,
+  getTripBudget,
+  getTripHealth
 };
+
+

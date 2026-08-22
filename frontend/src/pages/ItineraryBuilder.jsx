@@ -15,11 +15,12 @@ import {
   removeActivity,
   searchCities,
   getActivities,
-  calculateTripBudget,
-  detectTripConflicts,
-  calculateTripHealthScore,
+  getTripBudget,
+  getTripHealth,
   toggleShareStatus
 } from '../services/api';
+import TripHealthCard from '../components/TripHealthCard';
+import TripMap from '../components/TripMap';
 import {
   MapPin, Plus, Trash2, Calendar, Clock, DollarSign, ArrowUp, ArrowDown,
   AlertTriangle, ShieldCheck, Share2, Check, Copy, ExternalLink, Activity as ActivityIcon, Compass, Eye
@@ -33,6 +34,8 @@ export default function ItineraryBuilder() {
   const [trip, setTrip] = useState(null);
   const [loading, setLoading] = useState(true);
   const [transportSegments, setTransportSegments] = useState([]);
+  const [healthInfo, setHealthInfo] = useState(null);
+  const [budgetInfo, setBudgetInfo] = useState(null);
 
   // Modals
   const [isAddStopOpen, setIsAddStopOpen] = useState(false);
@@ -57,6 +60,19 @@ export default function ItineraryBuilder() {
     loadCatalogData();
   }, [id]);
 
+  const refreshHealthAndBudget = async () => {
+    try {
+      const [health, budget] = await Promise.all([
+        getTripHealth(id),
+        getTripBudget(id)
+      ]);
+      setHealthInfo(health);
+      setBudgetInfo(budget);
+    } catch (err) {
+      console.error('Failed to refresh health/budget:', err);
+    }
+  };
+
   const loadTripData = async () => {
     setLoading(true);
     try {
@@ -68,6 +84,8 @@ export default function ItineraryBuilder() {
       if (data.startDate && data.endDate) {
         setStopForm(prev => ({ ...prev, startDate: data.startDate, endDate: data.endDate }));
       }
+      
+      await refreshHealthAndBudget();
     } catch (err) {
       console.error(err);
     } finally {
@@ -119,6 +137,7 @@ export default function ItineraryBuilder() {
       setTrip(res.trip);
       setIsAddStopOpen(false);
       setStopForm({ city: '', cityId: null, startDate: trip.startDate, endDate: trip.endDate });
+      refreshHealthAndBudget();
     } catch (err) {
       setStopError(err.message || 'Failed to add stop.');
     }
@@ -128,6 +147,7 @@ export default function ItineraryBuilder() {
     if (window.confirm('Delete this destination city stop and all its activities?')) {
       const updated = await deleteStop(id, stopId);
       setTrip(updated);
+      refreshHealthAndBudget();
     }
   };
 
@@ -143,6 +163,7 @@ export default function ItineraryBuilder() {
 
     const updatedTrip = await reorderStops(id, newStops);
     setTrip(updatedTrip);
+    refreshHealthAndBudget();
   };
 
   // --- ACTIVITY MANAGEMENT ---
@@ -194,6 +215,7 @@ export default function ItineraryBuilder() {
       });
       setTrip(res.trip);
       setIsAddActivityOpen(false);
+      refreshHealthAndBudget();
     } catch (err) {
       setActivityError(err.message || 'Failed to add activity.');
     }
@@ -202,6 +224,7 @@ export default function ItineraryBuilder() {
   const handleRemoveActivity = async (stopId, actId) => {
     const updated = await removeActivity(id, stopId, actId);
     setTrip(updated);
+    refreshHealthAndBudget();
   };
 
   // --- PUBLIC SHARING ---
@@ -229,10 +252,7 @@ export default function ItineraryBuilder() {
     );
   }
 
-  // Conflict, Health Score & Budget Calculations
-  const conflicts = detectTripConflicts(trip, transportSegments);
-  const healthInfo = calculateTripHealthScore(trip, transportSegments);
-  const budgetInfo = calculateTripBudget(trip, [], transportSegments);
+
 
   return (
     <div className="dashboard-layout">
@@ -260,7 +280,7 @@ export default function ItineraryBuilder() {
               View Mode
             </Button>
             <Button variant="outline" size="sm" onClick={() => navigate(`/trips/${id}/budget`)}>
-              <DollarSign size={15} /> Budget (${budgetInfo.effectiveSpending})
+              <DollarSign size={15} /> Budget (${budgetInfo ? budgetInfo.effectiveSpending : '...'})
             </Button>
             <Button variant="outline" size="sm" onClick={() => navigate(`/trips/${id}/timeline`)}>
               <Clock size={15} /> Timeline
@@ -294,7 +314,7 @@ export default function ItineraryBuilder() {
         )}
 
         {/* Conflict & Warning Banner (#22 in prompt) */}
-        {!warningsDismissed && (conflicts.length > 0 || healthInfo.deductions.length > 0) && (
+        {!warningsDismissed && healthInfo && (healthInfo.conflicts.length > 0 || healthInfo.deductions.length > 0) && (
           <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.08)', border: '1px solid var(--danger)', padding: '1rem 1.25rem', borderRadius: 'var(--radius-lg)', marginBottom: '1.5rem', position: 'relative' }}>
             <button 
               onClick={() => setWarningsDismissed(true)}
@@ -303,38 +323,26 @@ export default function ItineraryBuilder() {
               ✕
             </button>
             <div style={{ fontWeight: 800, color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.95rem', marginBottom: '0.4rem' }}>
-              <AlertTriangle size={18} /> Itinerary Warnings & Conflicts Detected ({conflicts.length + healthInfo.deductions.length})
+              <AlertTriangle size={18} /> Itinerary Warnings & Conflicts Detected ({healthInfo.conflicts.length})
             </div>
+            <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.85rem', color: 'var(--text-main)' }}>
+              Your trip plan has some alerts. Click <a href="#health-card" style={{ color: 'var(--primary)', fontWeight: 'bold', textDecoration: 'underline' }}>here to view the Health breakdown card</a>.
+            </p>
             <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.85rem', color: 'var(--text-main)', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              {[...conflicts, ...healthInfo.deductions].map((warn, wIdx) => (
+              {healthInfo.conflicts.map((warn, wIdx) => (
                 <li key={wIdx}>{warn}</li>
               ))}
             </ul>
           </div>
         )}
 
-        {/* Trip Health Score Card (#24 in prompt) */}
-        <div style={{ backgroundColor: 'var(--surface)', padding: '1.25rem', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', boxShadow: 'var(--shadow-sm)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: healthInfo.score >= 80 ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '1.25rem', color: healthInfo.score >= 80 ? '#10b981' : '#f59e0b' }}>
-              {healthInfo.score}
-            </div>
-            <div>
-              <div style={{ fontWeight: 800, fontSize: '1.05rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <ShieldCheck size={18} color="var(--primary)" /> TRIP HEALTH SCORE — {healthInfo.status}
-              </div>
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                Evaluates dates, stop completeness, activity travel gaps, and budget compliance.
-              </div>
-            </div>
-          </div>
-
-          {healthInfo.deductions.length > 0 && (
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', maxWidth: '400px' }}>
-              <strong>Deductions:</strong> {healthInfo.deductions.join(' ')}
-            </div>
-          )}
+        {/* Trip Health Score Widget (Phase 2) */}
+        <div id="health-card">
+          <TripHealthCard healthInfo={healthInfo} />
         </div>
+
+        {/* Interactive Map (Phase 3) */}
+        <TripMap trip={trip} />
 
         {/* Main Section Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
@@ -479,7 +487,7 @@ export default function ItineraryBuilder() {
         )}
 
         {/* Embedded Intercity Transport Manager (#11 in prompt) */}
-        <TransportManager tripId={id} stops={trip.stops || []} onTransportChange={(segs) => setTransportSegments(segs)} />
+        <TransportManager tripId={id} stops={trip.stops || []} onTransportChange={(segs) => { setTransportSegments(segs); refreshHealthAndBudget(); }} />
 
         {/* Embedded Calendar & Day-Wise View (#9 & #10 in prompt) */}
         <TripCalendarView trip={trip} onRemoveActivity={handleRemoveActivity} />

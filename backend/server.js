@@ -4,10 +4,14 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
-// Initialize DB connection & tables
+// Initialize DB connection & schema
 require('./database');
 
 const authRoutes = require('./routes/auth');
+const tripRoutes = require('./routes/trips');
+const stopRoutes = require('./routes/stops');
+const activityRoutes = require('./routes/activities');
+const cityRoutes = require('./routes/cities');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -24,8 +28,12 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Routes
+// Register API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/trips', tripRoutes);
+app.use('/api/stops', stopRoutes);
+app.use('/api/activities', activityRoutes);
+app.use('/api/cities', cityRoutes);
 
 // 404 Handler
 app.use((req, res, next) => {

@@ -1,148 +1,179 @@
-# GlobeTrotter API Documentation (Hour 1)
+# GlobeTrotter API Documentation (Hour 1 & Hour 2)
 
 Base URL: `http://localhost:5000/api`
 
 ## Standard Response Format
 
-All responses follow a consistent JSON structure:
+All API endpoints return JSON using a consistent structure:
 
 ```json
 {
   "success": true,
-  "message": "Descriptive message",
+  "message": "Descriptive message string",
   "data": {}
 }
 ```
 
+Error responses:
+
+```json
+{
+  "success": false,
+  "message": "Error description message",
+  "data": null
+}
+```
+
 ---
 
-## Endpoints
+## 1. System & Authentication APIs
 
-### 1. Health Check
-
-Checks backend status and availability.
-
-- **URL:** `/health`
-- **Method:** `GET`
-- **Authentication:** None
+### `GET /api/health`
+Checks server status.
+- **Auth:** None
 - **Response:** `200 OK`
 
-```json
-{
-  "success": true,
-  "message": "GlobeTrotter API is running"
-}
-```
+### `POST /api/auth/signup`
+Registers a new user.
+- **Auth:** None
+- **Body:** `{ "name": "...", "email": "...", "password": "..." }`
+- **Response:** `201 Created` with `user` and `token`.
+
+### `POST /api/auth/login`
+Logs in existing user.
+- **Auth:** None
+- **Body:** `{ "email": "...", "password": "..." }`
+- **Response:** `200 OK` with `user` and `token`.
+
+### `GET /api/auth/me`
+Fetches current logged-in user profile.
+- **Auth:** `Bearer <token>`
+- **Response:** `200 OK` with `user`.
 
 ---
 
-### 2. User Signup
+## 2. Trip APIs
 
-Registers a new user into the database and returns a JWT access token.
+All Trip endpoints require `Authorization: Bearer <token>` and enforce strict user ownership.
 
-- **URL:** `/auth/signup`
-- **Method:** `POST`
-- **Authentication:** None
-- **Headers:** `Content-Type: application/json`
-- **Request Body:**
-
+### `POST /api/trips`
+Creates a new trip itinerary.
+- **Auth:** `Bearer <token>`
+- **Body:**
 ```json
 {
-  "name": "Alex Traveler",
-  "email": "alex@example.com",
-  "password": "Password123!"
+  "name": "European Summer Discovery",
+  "description": "2-week trip across Paris and Rome",
+  "start_date": "2026-07-01",
+  "end_date": "2026-07-15",
+  "cover_image": "https://example.com/paris.jpg"
 }
 ```
+- **Response:** `201 Created`
 
-- **Success Response:** `201 Created`
+### `GET /api/trips`
+Retrieves all trips belonging to the authenticated user.
+- **Auth:** `Bearer <token>`
+- **Response:** `200 OK` with array of user trips.
 
-```json
-{
-  "success": true,
-  "message": "User registered successfully",
-  "data": {
-    "user": {
-      "id": 1,
-      "name": "Alex Traveler",
-      "email": "alex@example.com",
-      "created_at": "2026-08-22 11:20:00"
-    },
-    "token": "<jwt_access_token>"
-  }
-}
-```
+### `GET /api/trips/:id`
+Retrieves single trip details including associated `stops` and `activities`.
+- **Auth:** `Bearer <token>`
+- **Response:** `200 OK` or `403 Forbidden` if unauthorized / `404 Not Found`.
 
-- **Error Responses:**
-  - `400 Bad Request`: Missing required fields or email already registered.
+### `PUT /api/trips/:id`
+Updates an existing trip.
+- **Auth:** `Bearer <token>`
+- **Body:** `{ "name": "Updated Name", "description": "...", "start_date": "...", "end_date": "...", "cover_image": "..." }`
+- **Response:** `200 OK` with updated trip object.
+
+### `DELETE /api/trips/:id`
+Deletes a trip and cascades to stops and activities.
+- **Auth:** `Bearer <token>`
+- **Response:** `200 OK`
 
 ---
 
-### 3. User Login
+## 3. Stop APIs
 
-Authenticates an existing user via email and bcrypt-hashed password, returning a JWT token.
-
-- **URL:** `/auth/login`
-- **Method:** `POST`
-- **Authentication:** None
-- **Headers:** `Content-Type: application/json`
-- **Request Body:**
-
+### `POST /api/trips/:id/stops`
+Adds a stop (city destination) to a trip.
+- **Auth:** `Bearer <token>`
+- **Body:**
 ```json
 {
-  "email": "alex@example.com",
-  "password": "Password123!"
+  "city_id": 1,
+  "city": "Paris",
+  "start_date": "2026-07-01",
+  "end_date": "2026-07-07",
+  "position": 0
 }
 ```
+- **Response:** `201 Created`
 
-- **Success Response:** `200 OK`
+### `GET /api/trips/:id/stops`
+Retrieves all stops for a specific trip sorted by position.
+- **Auth:** `Bearer <token>`
+- **Response:** `200 OK`
 
-```json
-{
-  "success": true,
-  "message": "Login successful",
-  "data": {
-    "user": {
-      "id": 1,
-      "name": "Alex Traveler",
-      "email": "alex@example.com",
-      "created_at": "2026-08-22 11:20:00"
-    },
-    "token": "<jwt_access_token>"
-  }
-}
-```
+### `PUT /api/stops/:id`
+Updates an existing stop directly by stop ID.
+- **Auth:** `Bearer <token>`
+- **Body:** `{ "city": "Paris Central", "start_date": "...", "end_date": "...", "position": 1 }`
+- **Response:** `200 OK`
 
-- **Error Responses:**
-  - `400 Bad Request`: Missing email or password.
-  - `401 Unauthorized`: Invalid credentials.
+### `DELETE /api/stops/:id`
+Deletes a stop by stop ID.
+- **Auth:** `Bearer <token>`
+- **Response:** `200 OK`
 
 ---
 
-### 4. Get Current User Profile (`/me`)
+## 4. Activity APIs
 
-Retrieves the currently authenticated user's profile information.
+### `GET /api/activities`
+Lists all available destination activities with optional filtering.
+- **Auth:** None
+- **Query Params:** `?city_id=1` or `?category=Sightseeing`
+- **Response:** `200 OK`
 
-- **URL:** `/auth/me`
-- **Method:** `GET`
-- **Authentication:** Required (`Bearer <token>`)
-- **Headers:**
-  - `Authorization: Bearer <jwt_access_token>`
-- **Success Response:** `200 OK`
+### `GET /api/activities/:id`
+Gets single activity details.
+- **Auth:** None
+- **Response:** `200 OK` or `404 Not Found`
 
+### `POST /api/trips/:id/activities`
+Attaches an activity to a user's trip itinerary.
+- **Auth:** `Bearer <token>`
+- **Body:**
 ```json
 {
-  "success": true,
-  "message": "User profile retrieved successfully",
-  "data": {
-    "user": {
-      "id": 1,
-      "name": "Alex Traveler",
-      "email": "alex@example.com",
-      "created_at": "2026-08-22 11:20:00"
-    }
-  }
+  "activity_id": 1,
+  "stop_id": 1,
+  "custom_name": "Eiffel Tower Sunset Tour",
+  "scheduled_date": "2026-07-02",
+  "scheduled_time": "18:00",
+  "cost": 30
 }
 ```
+- **Response:** `201 Created`
 
-- **Error Responses:**
-  - `401 Unauthorized`: Missing, invalid, or expired JWT token.
+### `DELETE /api/trips/:id/activities/:activityId`
+Removes an activity from a trip.
+- **Auth:** `Bearer <token>`
+- **Response:** `200 OK`
+
+---
+
+## 5. City APIs
+
+### `GET /api/cities`
+Retrieves all available cities.
+- **Auth:** None
+- **Response:** `200 OK`
+
+### `GET /api/cities/search?q=paris`
+Searches cities by name, country, or region.
+- **Auth:** None
+- **Query Param:** `q` (e.g. `paris`, `france`, `asia`)
+- **Response:** `200 OK`

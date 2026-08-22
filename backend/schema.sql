@@ -1,4 +1,4 @@
--- GlobeTrotter Database Schema
+-- GlobeTrotter Relational Database Schema (SQLite)
 
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -8,14 +8,25 @@ CREATE TABLE IF NOT EXISTS users (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS cities (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  country TEXT NOT NULL,
+  region TEXT,
+  cost_index INTEGER DEFAULT 5,
+  popularity INTEGER DEFAULT 80,
+  description TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS trips (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL,
-  title TEXT NOT NULL,
-  destination TEXT NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT,
   start_date TEXT,
   end_date TEXT,
-  budget REAL DEFAULT 0,
+  cover_image TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -23,31 +34,43 @@ CREATE TABLE IF NOT EXISTS trips (
 CREATE TABLE IF NOT EXISTS stops (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   trip_id INTEGER NOT NULL,
-  location TEXT NOT NULL,
-  arrival_date TEXT,
-  departure_date TEXT,
-  order_index INTEGER DEFAULT 0,
+  city_id INTEGER,
+  city TEXT,
+  start_date TEXT,
+  end_date TEXT,
+  position INTEGER DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (trip_id) REFERENCES trips(id) ON DELETE CASCADE
+  FOREIGN KEY (trip_id) REFERENCES trips(id) ON DELETE CASCADE,
+  FOREIGN KEY (city_id) REFERENCES cities(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS activities (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  city_id INTEGER,
   name TEXT NOT NULL,
   category TEXT,
-  location TEXT,
+  description TEXT,
+  duration REAL DEFAULT 1.0,
   cost REAL DEFAULT 0,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  location TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (city_id) REFERENCES cities(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS trip_activities (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   trip_id INTEGER NOT NULL,
-  activity_id INTEGER NOT NULL,
+  stop_id INTEGER,
+  activity_id INTEGER,
+  custom_name TEXT,
   scheduled_date TEXT,
+  scheduled_time TEXT,
+  cost REAL DEFAULT 0,
   status TEXT DEFAULT 'planned',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (trip_id) REFERENCES trips(id) ON DELETE CASCADE,
-  FOREIGN KEY (activity_id) REFERENCES activities(id) ON DELETE CASCADE
+  FOREIGN KEY (stop_id) REFERENCES stops(id) ON DELETE CASCADE,
+  FOREIGN KEY (activity_id) REFERENCES activities(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS expenses (

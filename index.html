@@ -1,0 +1,1526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HackaRandom - The Ultimate Random Hackathon Generator & Event Hub</title>
+    <meta name="description" content="Generate instant, crazy, game-changing hackathon ideas, randomize tech stacks, auto-generate pitch decks, assemble random AI dev teams, and run live hackathon countdowns.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --bg-dark: #070a14;
+            --bg-card: rgba(15, 23, 42, 0.75);
+            --bg-card-hover: rgba(30, 41, 59, 0.85);
+            --border-glass: rgba(255, 255, 255, 0.12);
+            --border-glow: rgba(6, 182, 212, 0.4);
+            
+            --primary: #06b6d4;
+            --primary-glow: rgba(6, 182, 212, 0.5);
+            --secondary: #d946ef;
+            --secondary-glow: rgba(217, 70, 239, 0.5);
+            --accent: #f59e0b;
+            --success: #10b981;
+            
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --text-dim: #64748b;
+            
+            --font-sans: 'Inter', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+            
+            --radius-sm: 8px;
+            --radius-md: 14px;
+            --radius-lg: 22px;
+            --radius-full: 9999px;
+            
+            --transition-fast: all 0.2s ease;
+            --transition-smooth: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: var(--font-sans);
+            line-height: 1.6;
+            overflow-x: hidden;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        /* Ambient Background Canvas */
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 0;
+            pointer-events: none;
+            opacity: 0.6;
+        }
+
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 0 24px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Glassmorphism Panels */
+        .glass-panel {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-md);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            transition: var(--transition-smooth);
+        }
+
+        .glass-panel:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Navigation Header */
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(7, 10, 20, 0.85);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border-glass);
+            padding: 16px 0;
+        }
+
+        .nav-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: var(--radius-md);
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: #fff;
+            box-shadow: 0 0 15px var(--primary-glow);
+        }
+
+        .logo-text {
+            font-size: 1.4rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #fff 30%, var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo-badge {
+            background: rgba(217, 70, 239, 0.15);
+            border: 1px solid var(--secondary);
+            color: var(--secondary);
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: var(--radius-full);
+            font-weight: 600;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            list-style: none;
+        }
+
+        .nav-link {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: var(--transition-fast);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            color: var(--primary);
+        }
+
+        /* Hero Banner Section */
+        .hero-section {
+            padding: 40px 0 60px;
+        }
+
+        .hero-card {
+            position: relative;
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            border: 1px solid var(--border-glass);
+            min-height: 380px;
+            display: flex;
+            align-items: center;
+            padding: 48px;
+            background: linear-gradient(90deg, rgba(7, 10, 20, 0.95) 30%, rgba(7, 10, 20, 0.6) 100%), 
+                        url('assets/hero.jpg') center/cover no-repeat;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+        }
+
+        .hero-content {
+            max-width: 650px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .hero-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(6, 182, 212, 0.15);
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            font-size: 0.85rem;
+            font-weight: 600;
+            padding: 6px 14px;
+            border-radius: var(--radius-full);
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .hero-title {
+            font-size: 3rem;
+            font-weight: 900;
+            line-height: 1.1;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 50%, var(--primary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero-description {
+            font-size: 1.15rem;
+            color: var(--text-muted);
+            margin-bottom: 32px;
+        }
+
+        .hero-actions {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 14px 28px;
+            border-radius: var(--radius-md);
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            transition: var(--transition-smooth);
+            text-decoration: none;
+            outline: none;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), #0284c7);
+            color: #fff;
+            box-shadow: 0 0 20px var(--primary-glow);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 0 30px var(--primary-glow);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, var(--secondary), #c026d3);
+            color: #fff;
+            box-shadow: 0 0 20px var(--secondary-glow);
+        }
+
+        .btn-secondary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 0 30px var(--secondary-glow);
+        }
+
+        .btn-outline {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-glass);
+            color: var(--text-main);
+        }
+
+        .btn-outline:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .btn-sm {
+            padding: 8px 16px;
+            font-size: 0.875rem;
+            border-radius: var(--radius-sm);
+        }
+
+        /* Main Generator Grid */
+        .generator-section {
+            margin-bottom: 60px;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 36px;
+        }
+
+        .section-title {
+            font-size: 2.2rem;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+
+        .section-subtitle {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+        }
+
+        /* Slot Machine Box */
+        .slot-container {
+            padding: 32px;
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.9) 0%, rgba(7, 10, 20, 0.95) 100%);
+            border: 1px solid rgba(6, 182, 212, 0.3);
+            box-shadow: 0 0 40px rgba(6, 182, 212, 0.15);
+        }
+
+        .slot-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+
+        .slot-card {
+            background: rgba(7, 10, 20, 0.7);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-md);
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            min-height: 180px;
+            transition: var(--transition-smooth);
+        }
+
+        .slot-card.spinning {
+            border-color: var(--primary);
+            box-shadow: 0 0 20px var(--primary-glow);
+            animation: pulse-glow 0.5s infinite alternate;
+        }
+
+        @keyframes pulse-glow {
+            from { box-shadow: 0 0 10px var(--primary-glow); }
+            to { box-shadow: 0 0 25px var(--secondary-glow); }
+        }
+
+        .slot-label {
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-dim);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .slot-label i {
+            color: var(--primary);
+        }
+
+        .slot-content {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #fff;
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+
+        .slot-badge {
+            display: inline-block;
+            margin-top: 12px;
+            padding: 4px 10px;
+            border-radius: var(--radius-full);
+            font-size: 0.75rem;
+            font-family: var(--font-mono);
+            font-weight: 600;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-muted);
+            border: 1px solid var(--border-glass);
+            align-self: flex-start;
+        }
+
+        .generator-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        /* Project Output & AI Pitch Synthesizer */
+        .output-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 60px;
+        }
+
+        @media (max-width: 992px) {
+            .output-section {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .pitch-card {
+            padding: 32px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .pitch-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-glass);
+        }
+
+        .project-name {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .pitch-tagline {
+            font-size: 1.1rem;
+            font-style: italic;
+            color: var(--text-muted);
+            margin-bottom: 20px;
+        }
+
+        .pitch-block {
+            margin-bottom: 20px;
+        }
+
+        .pitch-block-title {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .pitch-block-text {
+            color: var(--text-main);
+            font-size: 0.95rem;
+        }
+
+        .feature-list {
+            list-style: none;
+            display: grid;
+            gap: 10px;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9rem;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 8px 14px;
+            border-radius: var(--radius-sm);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .feature-item i {
+            color: var(--success);
+        }
+
+        /* Team Builder Card */
+        .team-card {
+            padding: 32px;
+        }
+
+        .team-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+        }
+
+        .team-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+
+        @media (max-width: 576px) {
+            .team-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .member-card {
+            background: rgba(7, 10, 20, 0.6);
+            border: 1px solid var(--border-glass);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            display: flex;
+            gap: 14px;
+            align-items: center;
+        }
+
+        .member-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: var(--radius-full);
+            background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(217, 70, 239, 0.2));
+            border: 2px solid var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            color: var(--text-main);
+            flex-shrink: 0;
+        }
+
+        .member-info h4 {
+            font-size: 0.95rem;
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+
+        .member-role {
+            font-size: 0.8rem;
+            color: var(--primary);
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .member-skills {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            font-family: var(--font-mono);
+        }
+
+        /* Timer & Audio Dashboard */
+        .tools-section {
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr;
+            gap: 24px;
+            margin-bottom: 60px;
+        }
+
+        @media (max-width: 992px) {
+            .tools-section {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .timer-card {
+            padding: 32px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .timer-display {
+            font-family: var(--font-mono);
+            font-size: 3.5rem;
+            font-weight: 800;
+            text-align: center;
+            margin: 20px 0;
+            background: linear-gradient(135deg, #fff, var(--primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 2px;
+            text-shadow: 0 0 20px var(--primary-glow);
+        }
+
+        .progress-bar-bg {
+            width: 100%;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: var(--radius-full);
+            overflow: hidden;
+            margin-bottom: 24px;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 65%;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            border-radius: var(--radius-full);
+            transition: width 0.4s ease;
+        }
+
+        .phase-stepper {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 24px;
+        }
+
+        .phase-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            font-weight: 600;
+        }
+
+        .phase-step.active {
+            color: var(--primary);
+        }
+
+        .phase-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: var(--radius-full);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .phase-step.active .phase-dot {
+            background: var(--primary);
+            box-shadow: 0 0 10px var(--primary-glow);
+        }
+
+        /* Audio Station */
+        .audio-card {
+            padding: 32px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .sound-visualizer {
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+            gap: 6px;
+            height: 60px;
+            margin: 20px 0;
+        }
+
+        .visualizer-bar {
+            width: 8px;
+            height: 15px;
+            background: var(--primary);
+            border-radius: var(--radius-sm);
+            transition: height 0.15s ease;
+        }
+
+        .audio-card.playing .visualizer-bar {
+            animation: sound-wave 0.8s infinite alternate ease-in-out;
+        }
+
+        .visualizer-bar:nth-child(1) { animation-delay: 0.1s; }
+        .visualizer-bar:nth-child(2) { animation-delay: 0.3s; }
+        .visualizer-bar:nth-child(3) { animation-delay: 0.2s; }
+        .visualizer-bar:nth-child(4) { animation-delay: 0.4s; }
+        .visualizer-bar:nth-child(5) { animation-delay: 0.15s; }
+
+        @keyframes sound-wave {
+            0% { height: 10px; background: var(--primary); }
+            100% { height: 50px; background: var(--secondary); }
+        }
+
+        /* Hall of Fame / Saved Ideas */
+        .hall-section {
+            margin-bottom: 80px;
+        }
+
+        .hall-banner {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            padding: 24px 32px;
+            margin-bottom: 32px;
+            border-radius: var(--radius-md);
+            background: linear-gradient(90deg, rgba(217, 70, 239, 0.15) 0%, rgba(6, 182, 212, 0.15) 100%);
+            border: 1px solid var(--secondary-glow);
+        }
+
+        .hall-trophy-img {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: var(--radius-md);
+            border: 2px solid var(--secondary);
+            box-shadow: 0 0 15px var(--secondary-glow);
+        }
+
+        .hall-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 24px;
+        }
+
+        .saved-card {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+        }
+
+        .saved-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .saved-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .saved-domain {
+            font-size: 0.75rem;
+            font-family: var(--font-mono);
+            color: var(--primary);
+            background: rgba(6, 182, 212, 0.1);
+            padding: 2px 8px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--primary-glow);
+        }
+
+        .saved-problem {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+
+        .saved-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-glass);
+            font-size: 0.85rem;
+        }
+
+        /* Toast Notifications */
+        .toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid var(--primary);
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: var(--radius-md);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slide-in 0.3s ease forwards;
+        }
+
+        @keyframes slide-in {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Footer */
+        footer {
+            background: rgba(7, 10, 20, 0.95);
+            border-top: 1px solid var(--border-glass);
+            padding: 32px 0;
+            text-align: center;
+            color: var(--text-dim);
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Ambient Particle Canvas Background -->
+    <canvas id="bg-canvas"></canvas>
+
+    <!-- Header Navigation -->
+    <header>
+        <div class="container nav-wrapper">
+            <a href="#" class="logo-group">
+                <div class="logo-icon"><i class="fa-solid fa-dice-d20"></i></div>
+                <div>
+                    <span class="logo-text">HACK-A-RANDOM</span>
+                    <span class="logo-badge">v2.5 AI</span>
+                </div>
+            </a>
+            <ul class="nav-links">
+                <li><a href="#generator" class="nav-link active"><i class="fa-solid fa-wand-magic-sparkles"></i> Generator</a></li>
+                <li><a href="#tools" class="nav-link"><i class="fa-solid fa-stopwatch"></i> Timer & Audio</a></li>
+                <li><a href="#hall-of-fame" class="nav-link"><i class="fa-solid fa-trophy"></i> Hall of Fame</a></li>
+            </ul>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container">
+        
+        <!-- Hero Banner Section -->
+        <section class="hero-section">
+            <div class="hero-card">
+                <div class="hero-content">
+                    <div class="hero-tag"><i class="fa-solid fa-bolt"></i> Cyber Hackathon Generator</div>
+                    <h1 class="hero-title">Spin. Hack. Build the Impossible.</h1>
+                    <p class="hero-description">Break developer block instantly. Generate wild hackathon challenges, randomized tech stacks, crazy constraints, instant pitch decks, and custom developer team rosters.</p>
+                    <div class="hero-actions">
+                        <button class="btn btn-primary" onclick="spinWheel()">
+                            <i class="fa-solid fa-dice"></i> SPIN HACKATHON WHEEL
+                        </button>
+                        <a href="#tools" class="btn btn-outline">
+                            <i class="fa-solid fa-play"></i> LAUNCH TIMER & SOUNDS
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Generator Section -->
+        <section id="generator" class="generator-section">
+            <div class="section-header">
+                <h2 class="section-title">Random Challenge Matrix</h2>
+                <p class="section-subtitle">Randomized tracks, problem statements, stack limits, and wildcards</p>
+            </div>
+
+            <div class="glass-panel slot-container">
+                <div class="slot-grid">
+                    <!-- Slot 1: Domain -->
+                    <div class="slot-card" id="slot-domain">
+                        <div class="slot-label"><i class="fa-solid fa-layer-group"></i> Track / Domain</div>
+                        <div class="slot-content" id="val-domain">Autonomous AI Agents</div>
+                        <div class="slot-badge" id="badge-domain">GEN-AI</div>
+                    </div>
+
+                    <!-- Slot 2: Problem Statement -->
+                    <div class="slot-card" id="slot-problem">
+                        <div class="slot-label"><i class="fa-solid fa-triangle-exclamation"></i> Core Problem</div>
+                        <div class="slot-content" id="val-problem">Prevent real-time deepfake identity spoofing in web3 video calls</div>
+                        <div class="slot-badge" id="badge-problem">SECURITY</div>
+                    </div>
+
+                    <!-- Slot 3: Tech Stack -->
+                    <div class="slot-card" id="slot-stack">
+                        <div class="slot-label"><i class="fa-solid fa-code"></i> Tech Stack</div>
+                        <div class="slot-content" id="val-stack">Next.js + WebRTC + OpenCV + Supabase</div>
+                        <div class="slot-badge" id="badge-stack">FULLSTACK</div>
+                    </div>
+
+                    <!-- Slot 4: Wildcard Constraint -->
+                    <div class="slot-card" id="slot-wildcard">
+                        <div class="slot-label"><i class="fa-solid fa-fire"></i> Wildcard Rule</div>
+                        <div class="slot-content" id="val-wildcard">Must be 100% offline executable with zero cloud APIs</div>
+                        <div class="slot-badge" id="badge-wildcard">HARD MODE</div>
+                    </div>
+                </div>
+
+                <div class="generator-controls">
+                    <button class="btn btn-primary" onclick="spinWheel()">
+                        <i class="fa-solid fa-rotate"></i> GENERATE NEW HACKATHON
+                    </button>
+                    <button class="btn btn-secondary" onclick="saveToHallOfFame()">
+                        <i class="fa-solid fa-bookmark"></i> SAVE TO HALL OF FAME
+                    </button>
+                    <button class="btn btn-outline" onclick="copyProjectBrief()">
+                        <i class="fa-solid fa-copy"></i> COPY BRIEF
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Project Synthesizer & Team Roster Output -->
+        <section class="output-section">
+            <!-- AI Pitch Synthesizer -->
+            <div class="glass-panel pitch-card">
+                <div>
+                    <div class="pitch-header">
+                        <div class="project-name" id="synth-title"><i class="fa-solid fa-terminal"></i> NeuroShield AI</div>
+                        <span class="logo-badge" id="synth-difficulty">⚡ HARDCORE</span>
+                    </div>
+
+                    <p class="pitch-tagline" id="synth-tagline">"Securing digital trust in a world of synthesized realities."</p>
+
+                    <div class="pitch-block">
+                        <div class="pitch-block-title">Elevator Pitch</div>
+                        <p class="pitch-block-text" id="synth-pitch">
+                            NeuroShield AI combines real-time computer vision frame analysis with decentralized identity credentials to verify true human presence during high-stakes video calls without sending telemetry data to central servers.
+                        </p>
+                    </div>
+
+                    <div class="pitch-block">
+                        <div class="pitch-block-title">Key MVP Deliverables</div>
+                        <ul class="feature-list" id="synth-features">
+                            <li class="feature-item"><i class="fa-solid fa-check"></i> 60FPS browser canvas face mesh verification</li>
+                            <li class="feature-item"><i class="fa-solid fa-check"></i> Zero-Knowledge proof token generation</li>
+                            <li class="feature-item"><i class="fa-solid fa-check"></i> Cyberpunk HUD dashboard UI</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div style="margin-top: 24px; display: flex; gap: 12px;">
+                    <button class="btn btn-outline btn-sm" onclick="exportMarkdown()"><i class="fa-solid fa-file-arrow-down"></i> Export Markdown</button>
+                </div>
+            </div>
+
+            <!-- Random Team Roster -->
+            <div class="glass-panel team-card">
+                <div class="team-header">
+                    <h3 style="font-size: 1.4rem; font-weight: 800;"><i class="fa-solid fa-users"></i> Random Team Roster</h3>
+                    <button class="btn btn-outline btn-sm" onclick="rerollTeam()"><i class="fa-solid fa-shuffle"></i> Reroll Squad</button>
+                </div>
+
+                <div class="team-grid" id="team-container">
+                    <!-- Dynamic Teammates inserted via JS -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Tools: Countdown Timer & Ambient Audio -->
+        <section id="tools" class="tools-section">
+            <!-- Timer Card -->
+            <div class="glass-panel timer-card">
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h3 style="font-size: 1.3rem; font-weight: 800;"><i class="fa-solid fa-stopwatch"></i> Hackathon Sprint Clock</h3>
+                        <span class="slot-badge" id="timer-status">IDLE</span>
+                    </div>
+
+                    <div class="timer-display" id="timer-text">24:00:00</div>
+
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" id="timer-progress" style="width: 100%;"></div>
+                    </div>
+
+                    <div class="phase-stepper">
+                        <div class="phase-step active" id="phase-1"><div class="phase-dot"></div>Ideation</div>
+                        <div class="phase-step" id="phase-2"><div class="phase-dot"></div>Core Dev</div>
+                        <div class="phase-step" id="phase-3"><div class="phase-dot"></div>Code Freeze</div>
+                        <div class="phase-step" id="phase-4"><div class="phase-dot"></div>Pitch Demo</div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+                    <button class="btn btn-primary btn-sm" onclick="toggleTimer()"><i class="fa-solid fa-play" id="timer-icon"></i> Start Sprint</button>
+                    <button class="btn btn-outline btn-sm" onclick="resetTimer(24)"><i class="fa-solid fa-rotate-left"></i> 24h Mode</button>
+                    <button class="btn btn-outline btn-sm" onclick="resetTimer(48)"><i class="fa-solid fa-rotate-left"></i> 48h Mode</button>
+                    <button class="btn btn-outline btn-sm" onclick="addTime()"><i class="fa-solid fa-plus"></i> +1 Hour</button>
+                </div>
+            </div>
+
+            <!-- Audio Station -->
+            <div class="glass-panel audio-card" id="audio-card">
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h3 style="font-size: 1.3rem; font-weight: 800;"><i class="fa-solid fa-radio"></i> Ambient Hacker Beats</h3>
+                        <span class="slot-badge" style="color: var(--secondary); border-color: var(--secondary-glow);">SYNTH ENGINE</span>
+                    </div>
+
+                    <div class="sound-visualizer">
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                        <div class="visualizer-bar"></div>
+                    </div>
+
+                    <div style="margin-bottom: 16px;">
+                        <label style="font-size: 0.85rem; color: var(--text-muted); display: block; margin-bottom: 8px;">Sound Mode</label>
+                        <select id="audio-mode" onchange="changeAudioMode()" style="width: 100%; background: rgba(7, 10, 20, 0.8); border: 1px solid var(--border-glass); color: #fff; padding: 10px; border-radius: var(--radius-sm); outline: none;">
+                            <option value="cyber">Cyberpunk Synth Pulse (Deep Focus)</option>
+                            <option value="lofi">Lo-Fi Cyber Chill (Ideation)</option>
+                            <option value="crunch">Crunch Time 8-Bit Synth (Sprint)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <button class="btn btn-secondary btn-sm" onclick="toggleAudio()" style="flex-grow: 1;">
+                        <i class="fa-solid fa-play" id="audio-btn-icon"></i> <span id="audio-btn-text">PLAY SOUNDTRACK</span>
+                    </button>
+                    <i class="fa-solid fa-volume-high" style="color: var(--text-muted);"></i>
+                    <input type="range" id="audio-volume" min="0" max="1" step="0.05" value="0.3" onchange="updateVolume()" style="accent-color: var(--secondary); width: 80px;">
+                </div>
+            </div>
+        </section>
+
+        <!-- Hall of Fame / Saved Ideas -->
+        <section id="hall-of-fame" class="hall-section">
+            <div class="hall-banner">
+                <img src="assets/trophy.jpg" alt="Hackathon Trophy" class="hall-trophy-img">
+                <div>
+                    <h3 style="font-size: 1.5rem; font-weight: 800; color: #fff;">Hackathon Hall of Fame</h3>
+                    <p style="color: var(--text-muted);">Saved generated hackathon challenges ready for your next big build.</p>
+                </div>
+            </div>
+
+            <div class="hall-grid" id="hall-grid-container">
+                <!-- Dynamically populated from LocalStorage -->
+            </div>
+        </section>
+    </main>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <p>Built for hackers, builders, & dreamers worldwide. HackaRandom Generator &copy; 2026.</p>
+        </div>
+    </footer>
+
+    <!-- Application JavaScript Logic -->
+    <script>
+        /* -------------------------------------------------------------
+           DATA POOLS FOR RANDOM GENERATOR
+        ------------------------------------------------------------- */
+        const DOMAINS = [
+            { text: "Autonomous AI Agents", badge: "AI/ML" },
+            { text: "Cybersecurity & ZK-Proofs", badge: "CRYPTO" },
+            { text: "GreenTech & Carbon Tracking", badge: "SUSTAINABILITY" },
+            { text: "BioTech & Gene Sequencing UI", badge: "HEALTH" },
+            { text: "Web3 Decentralized Gaming", badge: "GAMING" },
+            { text: "EduTech & Gamified Code Learning", badge: "EDTECH" },
+            { text: "FinTech & Automated Micro-Investing", badge: "FINANCE" },
+            { text: "Spatial Computing & AR Navigation", badge: "AR/VR" },
+            { text: "Developer Productivity Tools", badge: "DEVTOOLS" }
+        ];
+
+        const PROBLEMS = [
+            { text: "Prevent real-time deepfake identity spoofing in video calls", badge: "SECURITY" },
+            { text: "Automate smart-contract bug bounties using LLM code scanners", badge: "WEB3" },
+            { text: "Track personal carbon footprint via bank transaction receipts", badge: "ECO" },
+            { text: "Gamify peer-to-peer mental health support networks anonymously", badge: "SOCIAL" },
+            { text: "Predict municipal traffic congestion using real-time IoT feeds", badge: "SMART CITY" },
+            { text: "Convert complex legal contracts into interactive flowcharts", badge: "LEGALTECH" },
+            { text: "Generate instant 3D game assets from audio humming input", badge: "CREATIVE AI" },
+            { text: "Detect hallucinated citations in academic research papers", badge: "RESEARCH" }
+        ];
+
+        const STACKS = [
+            { text: "Next.js + WebRTC + OpenCV + Supabase", badge: "FULLSTACK" },
+            { text: "Python Fast-API + LangChain + Pinecone + Tailwind", badge: "AI STACK" },
+            { text: "Rust + WebAssembly + Tauri + SQLite", badge: "NATIVE DEVD" },
+            { text: "Flutter + Firebase + TensorFlow Lite", badge: "MOBILE AI" },
+            { text: "Vue 3 + Three.js + WebAudio API + Node.js", badge: "GRAPHICS" },
+            { text: "Solidity + Hardhat + React + Ethers.js", badge: "BLOCKCHAIN" }
+        ];
+
+        const WILDCARDS = [
+            { text: "Must be 100% offline executable with zero cloud APIs", badge: "HARD MODE" },
+            { text: "All user interactions must be voice-command controlled", badge: "ACCESSIBILITY" },
+            { text: "UI must mimic a 1980s Retro Arcade Terminal", badge: "RETRO STYLE" },
+            { text: "Total bundle size must remain strictly under 2MB", badge: "LIGHTWEIGHT" },
+            { text: "App must respond to gestures recorded via laptop webcam", badge: "VISION" },
+            { text: "Must incorporate real-time multiplayer collaborative editing", badge: "MULTIPLAYER" }
+        ];
+
+        const PROJECT_NAME_PREFIXES = ["Neuro", "Cyber", "Eco", "Quantum", "Bio", "Dev", "Pulse", "Synthetix", "Hyper", "Vortex"];
+        const PROJECT_NAME_SUFFIXES = ["Shield", "Flow", "Grid", "Matrix", "Chain", "Mind", "Forge", "Sphere", "Pulse", "Vault"];
+
+        const TEAM_ROLES = [
+            { role: "AI Prompt Architect", icon: "fa-brain", skills: "LangChain, Python, Vector DBs" },
+            { role: "Fullstack Ninja", icon: "fa-laptop-code", skills: "React, Node.js, PostgreSQL" },
+            { role: "UI/UX Wizard", icon: "fa-wand-magic-sparkles", skills: "Figma, Glassmorphism, CSS" },
+            { role: "Pitch Deck Maestro", icon: "fa-chart-line", skills: "Storytelling, Financials, Keynote" },
+            { role: "Security & ZK Specialist", icon: "fa-shield-halved", skills: "Rust, Cryptography, Auditing" },
+            { role: "Backend Engineer", icon: "fa-server", skills: "Go, Docker, Redis, Kubernetes" }
+        ];
+
+        const NAMES = ["Alex Vance", "Elena Rostova", "Marcus Chen", "Sarah Jenkins", "Devon Lee", "Zoe Sterling", "Kaelen Voss", "Maya Patel"];
+
+        /* Current State */
+        let currentDomain = DOMAINS[0];
+        let currentProblem = PROBLEMS[0];
+        let currentStack = STACKS[0];
+        let currentWildcard = WILDCARDS[0];
+        let currentProjectName = "NeuroShield AI";
+
+        /* -------------------------------------------------------------
+           SPINNING SLOT MACHINE LOGIC
+        ------------------------------------------------------------- */
+        function spinWheel() {
+            const slots = [
+                { card: document.getElementById('slot-domain'), val: document.getElementById('val-domain'), badge: document.getElementById('badge-domain'), data: DOMAINS, setCurr: (item) => currentDomain = item },
+                { card: document.getElementById('slot-problem'), val: document.getElementById('val-problem'), badge: document.getElementById('badge-problem'), data: PROBLEMS, setCurr: (item) => currentProblem = item },
+                { card: document.getElementById('slot-stack'), val: document.getElementById('val-stack'), badge: document.getElementById('badge-stack'), data: STACKS, setCurr: (item) => currentStack = item },
+                { card: document.getElementById('slot-wildcard'), val: document.getElementById('val-wildcard'), badge: document.getElementById('badge-wildcard'), data: WILDCARDS, setCurr: (item) => currentWildcard = item }
+            ];
+
+            // Add spinning animation class
+            slots.forEach(s => s.card.classList.add('spinning'));
+
+            let count = 0;
+            const interval = setInterval(() => {
+                slots.forEach(s => {
+                    const rand = s.data[Math.floor(Math.random() * s.data.length)];
+                    s.val.innerText = rand.text;
+                    s.badge.innerText = rand.badge;
+                });
+                count++;
+
+                if (count > 15) {
+                    clearInterval(interval);
+                    // Final Pick
+                    slots.forEach((s, idx) => {
+                        setTimeout(() => {
+                            const finalPick = s.data[Math.floor(Math.random() * s.data.length)];
+                            s.val.innerText = finalPick.text;
+                            s.badge.innerText = finalPick.badge;
+                            s.setCurr(finalPick);
+                            s.card.classList.remove('spinning');
+
+                            if (idx === slots.length - 1) {
+                                synthesizeProjectPitch();
+                                rerollTeam();
+                                showToast("🎲 New Hackathon Challenge Generated!");
+                            }
+                        }, idx * 150);
+                    });
+                }
+            }, 80);
+        }
+
+        /* -------------------------------------------------------------
+           PROJECT PITCH SYNTHESIZER
+        ------------------------------------------------------------- */
+        function synthesizeProjectPitch() {
+            const pref = PROJECT_NAME_PREFIXES[Math.floor(Math.random() * PROJECT_NAME_PREFIXES.length)];
+            const suff = PROJECT_NAME_SUFFIXES[Math.floor(Math.random() * PROJECT_NAME_SUFFIXES.length)];
+            currentProjectName = `${pref}${suff} AI`;
+
+            document.getElementById('synth-title').innerHTML = `<i class="fa-solid fa-terminal"></i> ${currentProjectName}`;
+            document.getElementById('synth-tagline').innerText = `"Solving ${currentDomain.text.toLowerCase()} with high impact innovation."`;
+            document.getElementById('synth-pitch').innerText = `A groundbreaking platform targeted at resolving: "${currentProblem.text}". Built with ${currentStack.text}, adhering strictly to constraint: "${currentWildcard.text}".`;
+            
+            document.getElementById('synth-features').innerHTML = `
+                <li class="feature-item"><i class="fa-solid fa-check"></i> Core MVP handling ${currentProblem.text.split(' ')[0]} pipeline</li>
+                <li class="feature-item"><i class="fa-solid fa-check"></i> Interactive dashboard using ${currentStack.text.split('+')[0]}</li>
+                <li class="feature-item"><i class="fa-solid fa-check"></i> Strict compliance with ${currentWildcard.badge} mode</li>
+            `;
+        }
+
+        /* -------------------------------------------------------------
+           RANDOM TEAM ROSTER BUILDER
+        ------------------------------------------------------------- */
+        function rerollTeam() {
+            const container = document.getElementById('team-container');
+            container.innerHTML = '';
+
+            const shuffledRoles = [...TEAM_ROLES].sort(() => 0.5 - Math.random()).slice(0, 4);
+            const shuffledNames = [...NAMES].sort(() => 0.5 - Math.random());
+
+            shuffledRoles.forEach((roleObj, i) => {
+                const name = shuffledNames[i];
+                const card = document.createElement('div');
+                card.className = 'member-card';
+                card.innerHTML = `
+                    <div class="member-avatar"><i class="fa-solid ${roleObj.icon}"></i></div>
+                    <div class="member-info">
+                        <h4>${name}</h4>
+                        <div class="member-role">${roleObj.role}</div>
+                        <div class="member-skills">${roleObj.skills}</div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        /* -------------------------------------------------------------
+           COUNTDOWN TIMER LOGIC
+        ------------------------------------------------------------- */
+        let timerSeconds = 24 * 3600;
+        let initialSeconds = 24 * 3600;
+        let timerInterval = null;
+        let isTimerRunning = false;
+
+        function updateTimerDisplay() {
+            const h = Math.floor(timerSeconds / 3600).toString().padStart(2, '0');
+            const m = Math.floor((timerSeconds % 3600) / 60).toString().padStart(2, '0');
+            const s = (timerSeconds % 60).toString().padStart(2, '0');
+            document.getElementById('timer-text').innerText = `${h}:${m}:${s}`;
+
+            const pct = (timerSeconds / initialSeconds) * 100;
+            document.getElementById('timer-progress').style.width = `${pct}%`;
+
+            // Phase indicator
+            const elapsedPct = 100 - pct;
+            document.querySelectorAll('.phase-step').forEach(el => el.classList.remove('active'));
+            if (elapsedPct < 20) document.getElementById('phase-1').classList.add('active');
+            else if (elapsedPct < 75) document.getElementById('phase-2').classList.add('active');
+            else if (elapsedPct < 90) document.getElementById('phase-3').classList.add('active');
+            else document.getElementById('phase-4').classList.add('active');
+        }
+
+        function toggleTimer() {
+            const btnIcon = document.getElementById('timer-icon');
+            const statusBadge = document.getElementById('timer-status');
+
+            if (isTimerRunning) {
+                clearInterval(timerInterval);
+                isTimerRunning = false;
+                btnIcon.className = "fa-solid fa-play";
+                statusBadge.innerText = "PAUSED";
+                statusBadge.style.color = "var(--accent)";
+            } else {
+                isTimerRunning = true;
+                btnIcon.className = "fa-solid fa-pause";
+                statusBadge.innerText = "HACKING LIVE";
+                statusBadge.style.color = "var(--success)";
+
+                timerInterval = setInterval(() => {
+                    if (timerSeconds > 0) {
+                        timerSeconds--;
+                        updateTimerDisplay();
+                    } else {
+                        clearInterval(timerInterval);
+                        isTimerRunning = false;
+                        showToast("⏰ Time's Up! Submit Your Project!");
+                    }
+                }, 1000);
+            }
+        }
+
+        function resetTimer(hours) {
+            if (isTimerRunning) toggleTimer();
+            initialSeconds = hours * 3600;
+            timerSeconds = initialSeconds;
+            updateTimerDisplay();
+            document.getElementById('timer-status').innerText = "IDLE";
+            document.getElementById('timer-status').style.color = "var(--text-muted)";
+            showToast(`⏱️ Timer reset to ${hours} Hours`);
+        }
+
+        function addTime() {
+            timerSeconds += 3600;
+            initialSeconds += 3600;
+            updateTimerDisplay();
+            showToast("➕ 1 Hour Added to Sprint!");
+        }
+
+        /* -------------------------------------------------------------
+           WEB AUDIO SYNTHESIZER (AMBIENT SOUNDTRACK)
+        ------------------------------------------------------------- */
+        let audioCtx = null;
+        let isAudioPlaying = false;
+        let osc1 = null, osc2 = null, gainNode = null;
+        let audioInterval = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function toggleAudio() {
+            initAudio();
+            const card = document.getElementById('audio-card');
+            const btnIcon = document.getElementById('audio-btn-icon');
+            const btnText = document.getElementById('audio-btn-text');
+
+            if (isAudioPlaying) {
+                stopAudio();
+                card.classList.remove('playing');
+                btnIcon.className = "fa-solid fa-play";
+                btnText.innerText = "PLAY SOUNDTRACK";
+                isAudioPlaying = false;
+            } else {
+                startAudio();
+                card.classList.add('playing');
+                btnIcon.className = "fa-solid fa-pause";
+                btnText.innerText = "PAUSE SOUNDTRACK";
+                isAudioPlaying = true;
+                showToast("🎵 Cyber Ambient Synth Playing...");
+            }
+        }
+
+        function startAudio() {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            gainNode = audioCtx.createGain();
+            gainNode.gain.value = parseFloat(document.getElementById('audio-volume').value);
+            gainNode.connect(audioCtx.destination);
+
+            // Synth loop generator
+            const notes = [110, 130.81, 146.83, 164.81, 196.00]; // A2 pentatonic scale
+            let step = 0;
+
+            audioInterval = setInterval(() => {
+                if (!isAudioPlaying) return;
+                const freq = notes[step % notes.length];
+                
+                const osc = audioCtx.createOscillator();
+                const noteGain = audioCtx.createGain();
+                
+                const mode = document.getElementById('audio-mode').value;
+                osc.type = mode === 'crunch' ? 'sawtooth' : 'sine';
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+                noteGain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                noteGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.6);
+
+                osc.connect(noteGain);
+                noteGain.connect(gainNode);
+
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.6);
+
+                step++;
+            }, 400);
+        }
+
+        function stopAudio() {
+            if (audioInterval) clearInterval(audioInterval);
+        }
+
+        function updateVolume() {
+            if (gainNode && audioCtx) {
+                gainNode.gain.setValueAtTime(parseFloat(document.getElementById('audio-volume').value), audioCtx.currentTime);
+            }
+        }
+
+        function changeAudioMode() {
+            if (isAudioPlaying) {
+                stopAudio();
+                startAudio();
+            }
+        }
+
+        /* -------------------------------------------------------------
+           HALL OF FAME & LOCALSTORAGE PERSISTENCE
+        ------------------------------------------------------------- */
+        function saveToHallOfFame() {
+            const saved = JSON.parse(localStorage.getItem('hacka_saved_ideas') || '[]');
+            
+            const newIdea = {
+                id: Date.now(),
+                title: currentProjectName,
+                domain: currentDomain.text,
+                problem: currentProblem.text,
+                stack: currentStack.text,
+                wildcard: currentWildcard.text,
+                date: new Date().toLocaleDateString()
+            };
+
+            saved.unshift(newIdea);
+            localStorage.setItem('hacka_saved_ideas', JSON.stringify(saved));
+            renderHallOfFame();
+            showToast("⭐ Idea Bookmarked in Hall of Fame!");
+        }
+
+        function renderHallOfFame() {
+            const container = document.getElementById('hall-grid-container');
+            const saved = JSON.parse(localStorage.getItem('hacka_saved_ideas') || '[]');
+
+            if (saved.length === 0) {
+                container.innerHTML = `
+                    <div style="grid-column: 1/-1; text-align: center; color: var(--text-dim); padding: 40px;" class="glass-panel">
+                        <i class="fa-solid fa-folder-open" style="font-size: 2.5rem; margin-bottom: 12px; display: block;"></i>
+                        <p>No saved hackathon ideas yet. Click <strong>"Save to Hall of Fame"</strong> to bookmark your favorite challenges!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = saved.map(item => `
+                <div class="glass-panel saved-card">
+                    <div>
+                        <div class="saved-header">
+                            <h4 class="saved-title">${item.title}</h4>
+                            <span class="saved-domain">${item.domain.split(' ')[0]}</span>
+                        </div>
+                        <p class="saved-problem">${item.problem}</p>
+                        <div style="font-size: 0.8rem; color: var(--text-muted); font-family: var(--font-mono); margin-bottom: 8px;">
+                            <i class="fa-solid fa-code"></i> ${item.stack}
+                        </div>
+                        <div style="font-size: 0.8rem; color: var(--accent); font-family: var(--font-mono);">
+                            <i class="fa-solid fa-fire"></i> ${item.wildcard}
+                        </div>
+                    </div>
+                    <div class="saved-footer">
+                        <span style="color: var(--text-dim); font-size: 0.75rem;"><i class="fa-regular fa-calendar"></i> ${item.date}</span>
+                        <button class="btn btn-outline btn-sm" onclick="deleteSavedIdea(${item.id})"><i class="fa-solid fa-trash"></i> Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function deleteSavedIdea(id) {
+            let saved = JSON.parse(localStorage.getItem('hacka_saved_ideas') || '[]');
+            saved = saved.filter(i => i.id !== id);
+            localStorage.setItem('hacka_saved_ideas', JSON.stringify(saved));
+            renderHallOfFame();
+            showToast("🗑️ Idea removed from Hall of Fame");
+        }
+
+        /* -------------------------------------------------------------
+           UTILITY & TOAST FUNCTIONS
+        ------------------------------------------------------------- */
+        function copyProjectBrief() {
+            const brief = `🚀 HACKATHON BRIEF: ${currentProjectName}\n📌 Track: ${currentDomain.text}\n🎯 Problem: ${currentProblem.text}\n🛠️ Stack: ${currentStack.text}\n⚡ Constraint: ${currentWildcard.text}`;
+            navigator.clipboard.writeText(brief);
+            showToast("📋 Brief copied to clipboard!");
+        }
+
+        function exportMarkdown() {
+            const md = `# Hackathon Project: ${currentProjectName}
+## Track: ${currentDomain.text}
+**Problem Statement:** ${currentProblem.text}
+**Tech Stack:** ${currentStack.text}
+**Wildcard Rule:** ${currentWildcard.text}
+
+### Pitch Summary
+${document.getElementById('synth-pitch').innerText}
+`;
+            const blob = new Blob([md], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${currentProjectName.replace(/\s+/g, '_')}_Brief.md`;
+            a.click();
+            showToast("📥 Pitch Deck Markdown Exported!");
+        }
+
+        function showToast(msg) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerHTML = `<i class="fa-solid fa-circle-check" style="color: var(--primary);"></i> <span>${msg}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        /* -------------------------------------------------------------
+           BACKGROUND PARTICLES CANVAS ANIMATION
+        ------------------------------------------------------------- */
+        const canvas = document.getElementById('bg-canvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 2 + 0.5;
+                this.speedX = Math.random() * 0.5 - 0.25;
+                this.speedY = Math.random() * 0.5 - 0.25;
+                this.color = Math.random() > 0.5 ? 'rgba(6, 182, 212, 0.4)' : 'rgba(217, 70, 239, 0.4)';
+            }
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                if (this.x < 0 || this.x > canvas.width) this.speedX *= -1;
+                if (this.y < 0 || this.y > canvas.height) this.speedY *= -1;
+            }
+            draw() {
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function initParticles() {
+            particles = [];
+            for (let i = 0; i < 50; i++) {
+                particles.push(new Particle());
+            }
+        }
+
+        function animateParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+            requestAnimationFrame(animateParticles);
+        }
+
+        /* Initialize App */
+        window.addEventListener('DOMContentLoaded', () => {
+            initParticles();
+            animateParticles();
+            synthesizeProjectPitch();
+            rerollTeam();
+            renderHallOfFame();
+            updateTimerDisplay();
+        });
+    </script>
+</body>
+</html>

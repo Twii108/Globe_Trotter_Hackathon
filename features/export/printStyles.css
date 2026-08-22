@@ -1,0 +1,49 @@
+/* features/export/printStyles.css */
+
+@media print {
+    /* Hide all navigational and interactive UI elements */
+    nav, header, footer, .btn, .sidebar, .modal, .no-print, button, input {
+        display: none !important;
+    }
+
+    /* Clean up layout for physical paper */
+    body {
+        background: white !important;
+        color: black !important;
+        font-size: 12pt;
+        margin: 0;
+        padding: 0;
+        line-height: 1.5;
+    }
+
+    /* Ensure logical page breaks */
+    .page-break {
+        page-break-before: always;
+    }
+
+    /* Style itinerary blocks for readability */
+    .itinerary-day {
+        border-bottom: 1px solid #ccc;
+        page-break-inside: avoid;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+    }
+
+    /* Inject GlobeTrotter Branding */
+    body::before {
+        content: "GlobeTrotter Travel Itinerary";
+        font-size: 24pt;
+        font-weight: bold;
+        display: block;
+        margin-bottom: 20px;
+        text-align: center;
+        border-bottom: 2px solid #333;
+        padding-bottom: 10px;
+    }
+
+    /* Ensure charts/maps print backgrounds */
+    .budget-chart, .map-container {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+}

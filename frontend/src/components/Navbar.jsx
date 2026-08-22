@@ -1,0 +1,87 @@
+import React from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Compass, Map, Compass as ExploreIcon, DollarSign, LogOut } from 'lucide-react';
+import Button from './Button';
+
+export default function Navbar({ user, onLogout }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const handleLogout = () => {
+    if (onLogout) {
+      onLogout();
+    } else {
+      navigate('/login');
+    }
+  };
+
+  const isActive = (path) => location.pathname === path;
+
+  return (
+    <header className="navbar">
+      <div className="container navbar-inner">
+        <Link to="/dashboard" className="navbar-brand">
+          <div className="navbar-brand-icon">
+            <Compass size={20} />
+          </div>
+          <span>GlobeTrotter</span>
+        </Link>
+
+        {user && (
+          <>
+            <nav>
+              <ul className="navbar-links">
+                <li>
+                  <Link
+                    to="/dashboard"
+                    className={`navbar-link ${isActive('/dashboard') ? 'active' : ''}`}
+                  >
+                    <Map size={18} />
+                    <span>Dashboard</span>
+                  </Link>
+                </li>
+                <li>
+                  <a href="#upcoming-trips" className="navbar-link">
+                    <Compass size={18} />
+                    <span>My Trips</span>
+                  </a>
+                </li>
+                <li>
+                  <a href="#recommendations" className="navbar-link">
+                    <ExploreIcon size={18} />
+                    <span>Explore</span>
+                  </a>
+                </li>
+                <li>
+                  <a href="#budget" className="navbar-link">
+                    <DollarSign size={18} />
+                    <span>Budget</span>
+                  </a>
+                </li>
+              </ul>
+            </nav>
+
+            <div className="navbar-user">
+              <div className="navbar-profile">
+                <img
+                  src={user.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80'}
+                  alt={user.name || 'User Avatar'}
+                  className="navbar-avatar"
+                />
+                <span className="navbar-username">{user.name || 'Traveler'}</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                icon={<LogOut size={16} />}
+                onClick={handleLogout}
+              >
+                Logout
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
+    </header>
+  );
+}

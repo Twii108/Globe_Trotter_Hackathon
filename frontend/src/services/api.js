@@ -59,6 +59,7 @@ export const normalizeUser = (user) => {
     email: user.email || '',
     avatar: user.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80',
     preferredCurrency: user.preferred_currency || user.preferredCurrency || 'USD',
+    travelStyle: user.travel_style || user.travelStyle || 'Balanced Explorer',
     createdAt: user.created_at || user.createdAt
   };
 };
@@ -68,11 +69,13 @@ export const normalizeActivity = (act) => {
   return {
     id: String(act.id),
     cityId: act.city_id || act.cityId ? String(act.city_id || act.cityId) : null,
+    cityName: act.city_name || act.cityName || '',
     name: act.custom_name || act.name || act.activity_name || 'Activity',
     category: act.category || 'Sightseeing',
     description: act.description || '',
     duration: Number(act.duration) || 1,
     cost: Number(act.cost) || 0,
+    estimatedCost: Number(act.cost) || 0,
     time: act.scheduled_time || act.time || '10:00 AM',
     date: act.scheduled_date || act.date || '',
     dayNumber: Number(act.dayNumber) || 1,
@@ -199,6 +202,18 @@ export const authService = {
     }
   },
 
+  async updateProfile(profileData) {
+    const res = await apiRequest('/profile', {
+      method: 'PUT',
+      body: {
+        name: profileData.name,
+        avatar: profileData.avatar,
+        preferred_currency: profileData.preferredCurrency || profileData.preferred_currency
+      }
+    });
+    return normalizeUser(res?.data?.user);
+  },
+
   async logout() {
     removeToken();
     return true;
@@ -300,6 +315,28 @@ export const reorderStops = async (tripId, updatedStops) => {
 
 // --- ACTIVITY SERVICE ---
 
+export const getActivities = async (params = {}) => {
+  const queryParams = new URLSearchParams();
+  if (params.cityId) queryParams.append('city_id', params.cityId);
+  if (params.category && params.category !== 'All') queryParams.append('category', params.category);
+
+  const queryStr = queryParams.toString() ? `?${queryParams.toString()}` : '';
+  const res = await apiRequest(`/activities${queryStr}`, { method: 'GET', requiresAuth: false });
+  let list = (res?.data || []).map(normalizeActivity);
+
+  if (params.maxCost !== undefined && params.maxCost !== null && params.maxCost !== '') {
+    list = list.filter(a => a.cost <= Number(params.maxCost));
+  }
+  if (params.searchQuery) {
+    const q = params.searchQuery.toLowerCase();
+    list = list.filter(a => a.name.toLowerCase().includes(q) || a.cityName.toLowerCase().includes(q));
+  }
+
+  return list;
+};
+
+export const searchActivities = getActivities;
+
 export const addActivity = async (tripId, stopId, activityData) => {
   const payload = {
     activity_id: activityData.activityId || activityData.activity_id || null,
@@ -331,12 +368,55 @@ export const getCities = async () => {
   return (res?.data || []).map(normalizeCity);
 };
 
-export const searchCities = async (query) => {
-  const res = await apiRequest(`/cities/search?q=${encodeURIComponent(query)}`, { method: 'GET', requiresAuth: false });
+export const searchCities = async (query = '') => {
+  const endpoint = query ? `/cities/search?q=${encodeURIComponent(query)}` : '/cities';
+  const res = await apiRequest(endpoint, { method: 'GET', requiresAuth: false });
   return (res?.data || []).map(normalizeCity);
 };
 
-// --- BUDGET, TIMELINE, EXPENSES & PROFILE ---
+// --- BUDGET, TIMELINE, EXPENSES & SHARING SERVICES ---
+
+export const getTripBudget = async (tripId) => {
+  const res = await apiRequest(`/trips/${tripId}/budget`, { method: 'GET' });
+  return res?.data;
+};
+
+export const getTripTimeline = async (tripId) => {
+  const res = await apiRequest(`/trips/${tripId}/timeline`, { method: 'GET' });
+  return res?.data;
+};
+
+export const addExpense = async (tripId, expenseData) => {
+  const res = await apiRequest(`/trips/${tripId}/expenses`, {
+    method: 'POST',
+    body: {
+      category: expenseData.category,
+      amount: Number(expenseData.amount),
+      description: expenseData.description
+    }
+  });
+  return normalizeExpense(res?.data);
+};
+
+export const getExpenses = async (tripId) => {
+  const res = await apiRequest(`/trips/${tripId}/expenses`, { method: 'GET' });
+  return (res?.data || []).map(normalizeExpense);
+};
+
+export const deleteExpense = async (expenseId) => {
+  await apiRequest(`/expenses/${expenseId}`, { method: 'DELETE' });
+  return true;
+};
+
+export const shareTrip = async (tripId) => {
+  const res = await apiRequest(`/trips/${tripId}/share`, { method: 'POST' });
+  return res?.data;
+};
+
+export const getSharedTrip = async (shareId) => {
+  const res = await apiRequest(`/shared/${shareId}`, { method: 'GET', requiresAuth: false });
+  return normalizeTrip(res?.data);
+};
 
 export const tripService = {
   getUpcomingTrips: getTrips,
@@ -398,5 +478,16 @@ export default {
   addActivity,
   removeActivity,
   deleteStop,
-  reorderStops
+  reorderStops,
+  getCities,
+  searchCities,
+  getActivities,
+  searchActivities,
+  getTripBudget,
+  getTripTimeline,
+  addExpense,
+  getExpenses,
+  deleteExpense,
+  shareTrip,
+  getSharedTrip
 };

@@ -7,6 +7,12 @@ import CreateTrip from './pages/CreateTrip';
 import MyTrips from './pages/MyTrips';
 import ItineraryBuilder from './pages/ItineraryBuilder';
 import ItineraryView from './pages/ItineraryView';
+import CitySearch from './pages/CitySearch';
+import ActivitySearch from './pages/ActivitySearch';
+import BudgetScreen from './pages/BudgetScreen';
+import TimelineScreen from './pages/TimelineScreen';
+import PublicShareScreen from './pages/PublicShareScreen';
+import ProfileSettings from './pages/ProfileSettings';
 import { authService, removeToken } from './services/api';
 
 export default function App() {
@@ -80,15 +86,13 @@ export default function App() {
         element={<Navigate to={currentUser ? "/dashboard" : "/login"} replace />}
       />
 
-      {/* Login Route */}
+      {/* Auth Routes */}
       <Route
         path="/login"
         element={
           currentUser ? <Navigate to="/dashboard" replace /> : <Login onLoginSuccess={handleLoginSuccess} />
         }
       />
-
-      {/* Signup Route */}
       <Route
         path="/signup"
         element={
@@ -96,7 +100,7 @@ export default function App() {
         }
       />
 
-      {/* Dashboard Route */}
+      {/* Main Pages */}
       <Route
         path="/dashboard"
         element={
@@ -107,8 +111,6 @@ export default function App() {
           )
         }
       />
-
-      {/* My Trips Route */}
       <Route
         path="/trips"
         element={
@@ -119,8 +121,6 @@ export default function App() {
           )
         }
       />
-
-      {/* Create Trip Route */}
       <Route
         path="/trips/create"
         element={
@@ -131,8 +131,38 @@ export default function App() {
           )
         }
       />
+      <Route
+        path="/cities"
+        element={
+          currentUser ? (
+            <CitySearch user={currentUser} onLogout={handleLogout} />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+      <Route
+        path="/activities"
+        element={
+          currentUser ? (
+            <ActivitySearch user={currentUser} onLogout={handleLogout} />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+      <Route
+        path="/profile"
+        element={
+          currentUser ? (
+            <ProfileSettings user={currentUser} onLogout={handleLogout} />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
 
-      {/* Itinerary Builder Route */}
+      {/* Trip Specific Sub-Screens */}
       <Route
         path="/trips/:id/builder"
         element={
@@ -143,8 +173,6 @@ export default function App() {
           )
         }
       />
-
-      {/* Itinerary View Route */}
       <Route
         path="/trips/:id"
         element={
@@ -155,8 +183,38 @@ export default function App() {
           )
         }
       />
+      <Route
+        path="/trips/:id/budget"
+        element={
+          currentUser ? (
+            <BudgetScreen user={currentUser} onLogout={handleLogout} />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+      <Route
+        path="/trips/:id/timeline"
+        element={
+          currentUser ? (
+            <TimelineScreen user={currentUser} onLogout={handleLogout} />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+      <Route
+        path="/trips/:id/share"
+        element={
+          currentUser ? (
+            <PublicShareScreen user={currentUser} onLogout={handleLogout} />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
 
-      {/* Fallback Catch-all Route */}
+      {/* Fallback Catch-all */}
       <Route
         path="*"
         element={<Navigate to="/" replace />}

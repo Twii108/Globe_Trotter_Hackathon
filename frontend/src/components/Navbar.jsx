@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Compass, Map, Compass as ExploreIcon, DollarSign, LogOut } from 'lucide-react';
+import { Compass, Map, Globe, Ticket, Plus, User, LogOut } from 'lucide-react';
 import Button from './Button';
 
 export default function Navbar({ user, onLogout }) {
@@ -51,25 +51,34 @@ export default function Navbar({ user, onLogout }) {
                 </li>
                 <li>
                   <Link
-                    to="/trips/create"
-                    className={`navbar-link ${isActive('/trips/create') ? 'active' : ''}`}
+                    to="/cities"
+                    className={`navbar-link ${isActive('/cities') ? 'active' : ''}`}
                   >
-                    <ExploreIcon size={18} />
-                    <span>Create Trip</span>
+                    <Globe size={18} />
+                    <span>Cities</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/activities"
+                    className={`navbar-link ${isActive('/activities') ? 'active' : ''}`}
+                  >
+                    <Ticket size={18} />
+                    <span>Activities</span>
                   </Link>
                 </li>
               </ul>
             </nav>
 
             <div className="navbar-user">
-              <div className="navbar-profile">
+              <Link to="/profile" className="navbar-profile" style={{ textDecoration: 'none', cursor: 'pointer' }}>
                 <img
                   src={user.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80'}
                   alt={user.name || 'User Avatar'}
                   className="navbar-avatar"
                 />
                 <span className="navbar-username">{user.name || 'Traveler'}</span>
-              </div>
+              </Link>
               <Button
                 variant="outline"
                 size="sm"
@@ -85,3 +94,4 @@ export default function Navbar({ user, onLogout }) {
     </header>
   );
 }
+

@@ -125,7 +125,7 @@ export default function ItineraryView({ user, onLogout }) {
               <span style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>/ Itinerary View</span>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
               {/* View Toggle */}
               <div
                 style={{
@@ -142,7 +142,7 @@ export default function ItineraryView({ user, onLogout }) {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.4rem',
-                    padding: '0.4rem 0.85rem',
+                    padding: '0.4rem 0.75rem',
                     borderRadius: 'var(--radius-sm)',
                     fontSize: '0.85rem',
                     fontWeight: 600,
@@ -153,7 +153,7 @@ export default function ItineraryView({ user, onLogout }) {
                     transition: 'var(--transition)'
                   }}
                 >
-                  <List size={15} /> List View
+                  <List size={15} /> List
                 </button>
                 <button
                   onClick={() => setViewMode('timeline')}
@@ -161,7 +161,7 @@ export default function ItineraryView({ user, onLogout }) {
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.4rem',
-                    padding: '0.4rem 0.85rem',
+                    padding: '0.4rem 0.75rem',
                     borderRadius: 'var(--radius-sm)',
                     fontSize: '0.85rem',
                     fontWeight: 600,
@@ -172,17 +172,44 @@ export default function ItineraryView({ user, onLogout }) {
                     transition: 'var(--transition)'
                   }}
                 >
-                  <GitCommit size={15} /> Timeline View
+                  <GitCommit size={15} /> Timeline
                 </button>
               </div>
 
               <Button
                 variant="outline"
-                size="md"
-                icon={<Edit3 size={16} />}
+                size="sm"
+                icon={<DollarSign size={15} />}
+                onClick={() => navigate(`/trips/${id}/budget`)}
+              >
+                Budget
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                icon={<GitCommit size={15} />}
+                onClick={() => navigate(`/trips/${id}/timeline`)}
+              >
+                Full Timeline
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                icon={<Edit3 size={15} />}
                 onClick={() => navigate(`/trips/${id}/builder`)}
               >
-                Edit Itinerary
+                Edit
+              </Button>
+
+              <Button
+                variant="primary"
+                size="sm"
+                icon={<Sparkles size={15} />}
+                onClick={() => navigate(`/trips/${id}/share`)}
+              >
+                Share Trip
               </Button>
             </div>
           </div>

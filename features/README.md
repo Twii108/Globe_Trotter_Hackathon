@@ -1,41 +1,70 @@
-# GlobeTrotter Features - Hour 2
+# GlobeTrotter Features - Final Hour (MVP Integration Guide)
 
-This module contains the travel data, budget calculators, timeline generators, and trip summaries for GlobeTrotter, entirely isolated from the frontend and backend to avoid merge conflicts.
+This module contains the complete travel intelligence system (data, search, budget, timeline, recommendations, and sharing). It is strictly decoupled from frontend/backend.
 
-## Hour 2: Utilities Added
+## Integration Object Structures
 
-### 1. Budget Calculator (`budget/budgetCalculator.js`)
-Calculates comprehensive financial data for a trip.
-
-**Key Function:** `calculateBudget(trip, userBudget)`
-**Returns:**
+### 1. `City` Object (Output from Data/Search)
 ```json
 {
-  "transport": 400,
-  "stay": 500,
-  "activities": 120,
-  "meals": 250,
-  "total": 1270,
-  "averagePerDay": 254,
-  "overBudget": false,
-  "budgetRemaining": 230
+  "id": "c1",
+  "name": "Paris",
+  "country": "France",
+  "region": "Europe",
+  "costIndex": 8,
+  "popularity": 95,
+  "description": "The City of Light..."
 }
 ```
 
-**Key Function:** `getDailyBudget(trip, dailyLimit)`
-**Returns:**
+### 2. `Activity` Object (Output from Data/Search)
 ```json
-[
-  { "date": "2026-09-15", "total": 174, "overBudget": false },
-  { "date": "2026-09-16", "total": 174, "overBudget": false }
-]
+{
+  "id": "a1",
+  "cityId": "c1",
+  "name": "Eiffel Tower Tour",
+  "category": "Sightseeing",
+  "description": "Ascend the iconic tower...",
+  "duration": 2.5,
+  "estimatedCost": 30
+}
 ```
 
-### 2. Timeline Generator (`timeline/timelineGenerator.js`)
-Generates a structured, chronological timeline spanning multiple cities.
+### 3. `Trip` Object (Required Input for Utilities)
+```json
+{
+  "id": "t1",
+  "name": "Euro Trip",
+  "startDate": "2026-09-15",
+  "endDate": "2026-09-22",
+  "stops": [
+    {
+      "cityId": "c1",
+      "city": "Paris",
+      "durationDays": 3,
+      "activities": [
+        { "cityId": "c1", "name": "Eiffel Tower Tour", "estimatedCost": 30, "duration": 2.5 }
+      ]
+    }
+  ]
+}
+```
 
-**Key Function:** `generateTimeline(trip)`
-**Returns:**
+### 4. `Budget` Object (Output from Budget Calculator)
+```json
+{
+  "transport": 300,
+  "stay": 300,
+  "activities": 30,
+  "meals": 150,
+  "total": 780,
+  "averagePerDay": 260,
+  "overBudget": false,
+  "budgetRemaining": null
+}
+```
+
+### 5. `Timeline` Object (Output from Timeline Generator)
 ```json
 [
   {
@@ -50,45 +79,32 @@ Generates a structured, chronological timeline spanning multiple cities.
 ]
 ```
 
-### 3. Trip Summary (`summary/tripSummary.js`)
-Generates high-level statistics for the dashboard or itinerary view.
-
-**Key Function:** `generateTripSummary(trip)`
-**Returns:**
+### 6. `PublicItinerary` Object (Output from Share Generator)
 ```json
 {
-  "totalTripDays": 7,
-  "numberOfCities": 2,
-  "numberOfActivities": 4,
-  "totalEstimatedCost": 1500,
-  "averageDailyCost": 214.28,
-  "mostExpensiveDay": { "day": "Day 2", "date": "2026-09-16", "cost": 350 },
-  "mostExpensiveCity": { "city": "Paris", "cost": 900 }
-}
-```
-
-### ⚠️ Sample Trip Object (Input Format required by these modules)
-Your `trip` object passed from the frontend/backend should look like this:
-```json
-{
-  "id": "t1",
-  "name": "Euro Trip",
+  "isPublic": true,
+  "tripName": "Euro Trip",
   "startDate": "2026-09-15",
-  "stops": [
-    {
-      "city": "Paris",
-      "durationDays": 3,
-      "activities": [
-        { "name": "Eiffel Tower Tour", "estimatedCost": 30, "duration": 2 }
-      ]
-    }
-  ]
+  "endDate": "2026-09-22",
+  "cities": ["Paris"],
+  "activities": ["Eiffel Tower Tour"],
+  "timeline": [...],
+  "budgetSummary": {
+    "totalEstimatedCost": 780,
+    "transportCost": 300,
+    "stayCost": 300,
+    "activitiesCost": 30,
+    "mealsCost": 150
+  }
 }
 ```
 
----
-
-## Hour 1: Data & Recommendations
-*   `data/cities.json`, `data/activities.json`
-*   `search/citySearch.js`, `search/activitySearch.js`
-*   `recommendations/recommendations.js`
+## Available Modules
+- `data/*`: Raw JSON datasets
+- `search/*`: City and Activity search engines
+- `recommendations/recommendations.js`: Preference-based recommenders
+- `budget/budgetCalculator.js`: Financial logic
+- `timeline/timelineGenerator.js`: Chronological builders
+- `summary/tripSummary.js`: High-level analytics
+- `sharing/shareGenerator.js`: Public URL/ID and Read-Only generation
+- `validation/tripValidator.js`: Ensures input integrity

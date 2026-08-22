@@ -23,7 +23,9 @@ const {
 
 const {
   getTripBudget,
-  getTripTimeline
+  getTripHealth,
+  getTripTimeline,
+  optimizeTripBudget
 } = require('../controllers/budgetTimelineController');
 
 const {
@@ -65,6 +67,8 @@ router.post('/:id/transport', addTransportSegment);
 
 // Budget & Timeline
 router.get('/:id/budget', getTripBudget);
+router.get('/:id/optimize-budget', optimizeTripBudget);
+router.get('/:id/health', getTripHealth);
 router.get('/:id/timeline', getTripTimeline);
 
 // Expenses

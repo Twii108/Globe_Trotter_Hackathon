@@ -455,13 +455,24 @@ export const calculateTripHealthScore = (trip, transportSegments = []) => {
 };
 
 // --- DETERMINISTIC SMART RECOMMENDATION ENGINE ---
-export const calculateRecommendationScore = (user, city) => {
+export const calculateRecommendationScore = async (user, city) => {
   let score = 75; // base score
   const whyRecommended = [];
 
   // 1. Budget Match
-  const userBudget = 2500;
-  const cityCost = (city.costIndex || 5) * 250;
+  let userBudget = 2500;
+  try {
+      const trips = await getTrips();
+      if (trips && trips.length > 0) {
+          const totalBudget = trips.reduce((sum, t) => sum + (Number(t.budget) || 0), 0);
+          const tripsWithBudget = trips.filter(t => Number(t.budget) > 0).length;
+          if (tripsWithBudget > 0) {
+              userBudget = totalBudget / tripsWithBudget;
+          }
+      }
+  } catch (err) {}
+  
+  const cityCost = (city.costIndex || 5) * (userBudget / 10);
   if (cityCost <= userBudget) {
     score += 10;
     whyRecommended.push('Fits comfortably within your target budget');
@@ -980,9 +991,10 @@ export const tripService = {
 
   async getRecommendedDestinations() {
     const cities = await getCities();
-    return cities.slice(0, 4).map(c => {
-      const rec = calculateRecommendationScore(currentUserSession, c);
-      return {
+    const recommendedCities = [];
+    for (const c of cities.slice(0, 4)) {
+      const rec = await calculateRecommendationScore(currentUserSession, c);
+      recommendedCities.push({
         id: c.id,
         title: c.name,
         location: `${c.name}, ${c.country}`,
@@ -993,8 +1005,9 @@ export const tripService = {
         category: c.region || 'Discovery',
         matchScore: rec.matchScore,
         whyRecommended: rec.whyRecommended
-      };
-    });
+      });
+    }
+    return recommendedCities;
   },
 
   async getBudgetSummary() {

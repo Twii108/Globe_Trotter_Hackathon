@@ -174,6 +174,16 @@ export default function App() {
         }
       />
       <Route
+        path="/trips/:id/view"
+        element={
+          currentUser ? (
+            <ItineraryView user={currentUser} onLogout={handleLogout} />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+      <Route
         path="/trips/:id"
         element={
           currentUser ? (

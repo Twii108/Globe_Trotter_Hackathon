@@ -22,7 +22,7 @@ import {
 } from '../services/api';
 import {
   MapPin, Plus, Trash2, Calendar, Clock, DollarSign, ArrowUp, ArrowDown,
-  AlertTriangle, ShieldCheck, Share2, Check, Copy, ExternalLink, Activity as ActivityIcon, Compass
+  AlertTriangle, ShieldCheck, Share2, Check, Copy, ExternalLink, Activity as ActivityIcon, Compass, Eye
 } from 'lucide-react';
 import '../styles/dashboard.css';
 
@@ -50,6 +50,7 @@ export default function ItineraryBuilder() {
   // Sharing
   const [shareId, setShareId] = useState(null);
   const [shareCopied, setShareCopied] = useState(false);
+  const [warningsDismissed, setWarningsDismissed] = useState(false);
 
   useEffect(() => {
     loadTripData();
@@ -255,6 +256,9 @@ export default function ItineraryBuilder() {
           </div>
 
           <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+            <Button variant="outline" size="sm" icon={<Eye size={15} />} onClick={() => navigate(`/trips/${id}/view`)}>
+              View Mode
+            </Button>
             <Button variant="outline" size="sm" onClick={() => navigate(`/trips/${id}/budget`)}>
               <DollarSign size={15} /> Budget (${budgetInfo.effectiveSpending})
             </Button>
@@ -290,14 +294,20 @@ export default function ItineraryBuilder() {
         )}
 
         {/* Conflict & Warning Banner (#22 in prompt) */}
-        {conflicts.length > 0 && (
-          <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.08)', border: '1px solid var(--danger)', padding: '1rem 1.25rem', borderRadius: 'var(--radius-lg)', marginBottom: '1.5rem' }}>
+        {!warningsDismissed && (conflicts.length > 0 || healthInfo.deductions.length > 0) && (
+          <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.08)', border: '1px solid var(--danger)', padding: '1rem 1.25rem', borderRadius: 'var(--radius-lg)', marginBottom: '1.5rem', position: 'relative' }}>
+            <button 
+              onClick={() => setWarningsDismissed(true)}
+              style={{ position: 'absolute', top: '10px', right: '10px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', fontWeight: 'bold' }}
+            >
+              ✕
+            </button>
             <div style={{ fontWeight: 800, color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.95rem', marginBottom: '0.4rem' }}>
-              <AlertTriangle size={18} /> Itinerary Warnings & Conflicts Detected ({conflicts.length})
+              <AlertTriangle size={18} /> Itinerary Warnings & Conflicts Detected ({conflicts.length + healthInfo.deductions.length})
             </div>
             <ul style={{ margin: 0, paddingLeft: '1.25rem', fontSize: '0.85rem', color: 'var(--text-main)', display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-              {conflicts.map((conf, cIdx) => (
-                <li key={cIdx}>{conf}</li>
+              {[...conflicts, ...healthInfo.deductions].map((warn, wIdx) => (
+                <li key={wIdx}>{warn}</li>
               ))}
             </ul>
           </div>

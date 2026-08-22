@@ -12,9 +12,13 @@ import {
   calculateTripBudget
 } from '../services/api';
 import {
-  DollarSign, Plus, AlertTriangle, ArrowLeft, PieChart, TrendingUp,
+  DollarSign, Plus, AlertTriangle, ArrowLeft, PieChart as PieChartIcon, TrendingUp,
   Receipt, Plane, Bed, Utensils, Activity, Tag, Trash2, Calendar
 } from 'lucide-react';
+import {
+  PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid
+} from 'recharts';
 import '../styles/dashboard.css';
 
 export default function BudgetScreen() {
@@ -183,48 +187,62 @@ export default function BudgetScreen() {
         {/* CATEGORY COST BREAKDOWN PROGRESS BARS */}
         <div style={{ backgroundColor: 'var(--surface)', padding: '1.5rem', borderRadius: 'var(--radius-xl)', border: '1px solid var(--border)', marginBottom: '2rem', boxShadow: 'var(--shadow-sm)' }}>
           <h3 style={{ margin: '0 0 1.25rem', fontSize: '1.15rem', fontWeight: 800, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <PieChart size={20} color="var(--primary)" /> Expense Category Breakdown
+            <PieChartIcon size={20} color="var(--primary)" /> Expense Category Breakdown
           </h3>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', fontWeight: 700, marginBottom: '0.35rem' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Plane size={15} color="var(--primary)" /> Intercity Transport</span>
-                <span>${budgetInfo.categoryTotals.Transport || budgetInfo.transport}</span>
-              </div>
-              <div style={{ height: '8px', backgroundColor: 'var(--neutral-bg)', borderRadius: '4px', overflow: 'hidden' }}>
-                <div style={{ width: `${Math.min(100, (budgetInfo.transport / (budgetInfo.totalEstimated || 1)) * 100)}%`, height: '100%', backgroundColor: 'var(--primary)' }} />
-              </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2rem' }}>
+            {/* Pie Chart */}
+            <div style={{ flex: '1 1 300px', height: '300px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: 'Transport', value: budgetInfo.categoryTotals.Transport || budgetInfo.transport, color: '#0f4c81' },
+                      { name: 'Accommodation', value: budgetInfo.categoryTotals.Accommodation || budgetInfo.stay, color: '#fca311' },
+                      { name: 'Activities', value: budgetInfo.categoryTotals.Activities || budgetInfo.activities, color: '#10b981' },
+                      { name: 'Meals', value: budgetInfo.categoryTotals.Meals || budgetInfo.meals, color: '#f59e0b' }
+                    ].filter(d => d.value > 0)}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {[
+                      { name: 'Transport', value: budgetInfo.categoryTotals.Transport || budgetInfo.transport, color: '#0f4c81' },
+                      { name: 'Accommodation', value: budgetInfo.categoryTotals.Accommodation || budgetInfo.stay, color: '#fca311' },
+                      { name: 'Activities', value: budgetInfo.categoryTotals.Activities || budgetInfo.activities, color: '#10b981' },
+                      { name: 'Meals', value: budgetInfo.categoryTotals.Meals || budgetInfo.meals, color: '#f59e0b' }
+                    ].filter(d => d.value > 0).map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value) => `$${value}`} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
             </div>
-
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', fontWeight: 700, marginBottom: '0.35rem' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Bed size={15} color="var(--accent)" /> Accommodation / Stay</span>
-                <span>${budgetInfo.categoryTotals.Accommodation || budgetInfo.stay}</span>
-              </div>
-              <div style={{ height: '8px', backgroundColor: 'var(--neutral-bg)', borderRadius: '4px', overflow: 'hidden' }}>
-                <div style={{ width: `${Math.min(100, (budgetInfo.stay / (budgetInfo.totalEstimated || 1)) * 100)}%`, height: '100%', backgroundColor: 'var(--accent)' }} />
-              </div>
-            </div>
-
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', fontWeight: 700, marginBottom: '0.35rem' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Activity size={15} color="#10b981" /> Tours & Activities</span>
-                <span>${budgetInfo.categoryTotals.Activities || budgetInfo.activities}</span>
-              </div>
-              <div style={{ height: '8px', backgroundColor: 'var(--neutral-bg)', borderRadius: '4px', overflow: 'hidden' }}>
-                <div style={{ width: `${Math.min(100, (budgetInfo.activities / (budgetInfo.totalEstimated || 1)) * 100)}%`, height: '100%', backgroundColor: '#10b981' }} />
-              </div>
-            </div>
-
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem', fontWeight: 700, marginBottom: '0.35rem' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Utensils size={15} color="#f59e0b" /> Meals & Dining</span>
-                <span>${budgetInfo.categoryTotals.Meals || budgetInfo.meals}</span>
-              </div>
-              <div style={{ height: '8px', backgroundColor: 'var(--neutral-bg)', borderRadius: '4px', overflow: 'hidden' }}>
-                <div style={{ width: `${Math.min(100, (budgetInfo.meals / (budgetInfo.totalEstimated || 1)) * 100)}%`, height: '100%', backgroundColor: '#f59e0b' }} />
-              </div>
+            
+            {/* Bar Chart for Daily Expenses */}
+            <div style={{ flex: '1 1 400px', height: '300px' }}>
+               <h4 style={{ margin: '0 0 1rem', fontSize: '1rem', color: 'var(--text-main)', textAlign: 'center' }}>Daily Expenses</h4>
+               <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={
+                  Object.values(expenses.reduce((acc, exp) => {
+                    const date = exp.expenseDate || exp.expense_date || new Date().toISOString().split('T')[0];
+                    if (!acc[date]) acc[date] = { date, amount: 0 };
+                    acc[date].amount += Number(exp.amount);
+                    return acc;
+                  }, {})).sort((a, b) => new Date(a.date) - new Date(b.date))
+                }>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <Tooltip formatter={(value) => `$${value}`} />
+                  <Bar dataKey="amount" fill="var(--primary)" name="Total Spent ($)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </div>
         </div>

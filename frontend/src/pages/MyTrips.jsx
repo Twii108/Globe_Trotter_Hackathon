@@ -181,8 +181,11 @@ export default function MyTrips() {
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Button variant="primary" size="sm" icon={<Eye size={14} />} onClick={(e) => { e.stopPropagation(); navigate(`/trips/${trip.id}`); }}>
+                      <Button variant="outline" size="sm" icon={<Eye size={14} />} onClick={(e) => { e.stopPropagation(); navigate(`/trips/${trip.id}/view`); }}>
                         View
+                      </Button>
+                      <Button variant="primary" size="sm" icon={<Edit size={14} />} onClick={(e) => { e.stopPropagation(); navigate(`/trips/${trip.id}`); }}>
+                        Edit
                       </Button>
 
                       <div style={{ display: 'flex', gap: '0.4rem' }}>

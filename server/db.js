@@ -28,6 +28,29 @@ function getSqliteDb() {
     const sqlite3 = require('sqlite3').verbose();
     const dbPath = path.join(__dirname, 'dev_database.sqlite');
     sqliteDb = new sqlite3.Database(dbPath);
+    sqliteDb.serialize(() => {
+      sqliteDb.run(`
+        CREATE TABLE IF NOT EXISTS cities (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          country TEXT NOT NULL,
+          cost_index INTEGER DEFAULT 50,
+          popularity INTEGER DEFAULT 50
+        );
+      `);
+      sqliteDb.run(`
+        CREATE TABLE IF NOT EXISTS trips (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          start_date TEXT,
+          end_date TEXT,
+          description TEXT,
+          cover_photo_url TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+    });
   }
   return sqliteDb;
 }
@@ -57,10 +80,12 @@ function querySqlite(text, params = []) {
         resolve({ rows: rows || [] });
       });
     } else {
+      const tableNameMatch = sqliteSql.match(/INTO\s+(\w+)/i);
+      const tableName = tableNameMatch ? tableNameMatch[1] : 'cities';
       db.run(sqliteSql, params, function (err) {
         if (err) return reject(err);
         if (this.lastID) {
-          db.get('SELECT * FROM cities WHERE id = ?', [this.lastID], (gErr, row) => {
+          db.get(`SELECT * FROM ${tableName} WHERE id = ?`, [this.lastID], (gErr, row) => {
             if (gErr || !row) resolve({ rows: [{ id: this.lastID }] });
             else resolve({ rows: [row] });
           });

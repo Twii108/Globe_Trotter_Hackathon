@@ -374,11 +374,60 @@ export const searchCities = async (query = '') => {
   return (res?.data || []).map(normalizeCity);
 };
 
-// --- BUDGET, TIMELINE, EXPENSES & SHARING SERVICES ---
+export const calculateTripBudget = (trip) => {
+  if (!trip) return { transport: 0, stay: 0, activities: 0, meals: 0, total: 0, userBudget: 0, remainingBudget: 0, isOverBudget: false, avgDailyCost: 0, durationDays: 1 };
+  
+  const stops = trip.stops || [];
+  let durationDays = trip.durationDays || 7;
+  
+  if (stops.length > 0) {
+    const calculatedDays = stops.reduce((sum, s) => {
+      const d1 = new Date(s.startDate);
+      const d2 = new Date(s.endDate);
+      if (isNaN(d1.getTime()) || isNaN(d2.getTime())) return sum + 1;
+      const days = Math.max(1, Math.ceil(Math.abs(d2 - d1) / (1000 * 60 * 60 * 24)) + 1);
+      return sum + days;
+    }, 0);
+    if (calculatedDays > 0) durationDays = calculatedDays;
+  }
+
+  const transportCost = 300 + Math.max(0, stops.length - 1) * 120;
+  const stayCost = durationDays * 95;
+  const mealCost = durationDays * 45;
+
+  const activityCost = stops.reduce((total, stop) => {
+    return total + (stop.activities || []).reduce((aSum, act) => aSum + (Number(act.cost || act.estimatedCost) || 0), 0);
+  }, 0);
+
+  const totalCost = transportCost + stayCost + activityCost + mealCost;
+  const userBudget = Number(trip.budget) || 2500;
+  const remainingBudget = userBudget - totalCost;
+  const isOverBudget = totalCost > userBudget;
+  const avgDailyCost = Number((totalCost / Math.max(1, durationDays)).toFixed(2));
+
+  return {
+    transport: transportCost,
+    stay: stayCost,
+    activities: activityCost,
+    meals: mealCost,
+    total: totalCost,
+    userBudget,
+    remainingBudget,
+    isOverBudget,
+    avgDailyCost,
+    durationDays
+  };
+};
 
 export const getTripBudget = async (tripId) => {
-  const res = await apiRequest(`/trips/${tripId}/budget`, { method: 'GET' });
-  return res?.data;
+  try {
+    const res = await apiRequest(`/trips/${tripId}/budget`, { method: 'GET' });
+    if (res?.data) return res.data;
+  } catch (err) {
+    // fallback
+  }
+  const trip = await getTrip(tripId);
+  return calculateTripBudget(trip);
 };
 
 export const getTripTimeline = async (tripId) => {

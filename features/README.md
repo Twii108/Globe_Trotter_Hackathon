@@ -1,44 +1,94 @@
-# GlobeTrotter Features - Hour 1
+# GlobeTrotter Features - Hour 2
 
-This module contains the travel data and utility functions for GlobeTrotter, entirely isolated from the frontend and backend to avoid merge conflicts.
+This module contains the travel data, budget calculators, timeline generators, and trip summaries for GlobeTrotter, entirely isolated from the frontend and backend to avoid merge conflicts.
 
-## Data Structures
+## Hour 2: Utilities Added
 
-### City Data (`data/cities.json`)
-Contains 15 diverse global destinations. Each object includes:
-- `id`: Unique identifier (e.g., "c1")
-- `name`: City name
-- `country`: Country name
-- `region`: Geographic region
-- `costIndex`: Scale of 1-10 for budget estimates
-- `popularity`: Scale of 1-100
-- `description`: Brief summary
+### 1. Budget Calculator (`budget/budgetCalculator.js`)
+Calculates comprehensive financial data for a trip.
 
-### Activity Data (`data/activities.json`)
-Contains activities mapped to cities. Categories include Sightseeing, Food, Adventure, Culture, Shopping, Nature.
-- `id`: Unique identifier
-- `cityId`: Foreign key to `cities.json`
-- `name`: Activity title
-- `category`: Activity type
-- `description`: Details
-- `duration`: Estimated hours
-- `estimatedCost`: Approximate cost in USD
+**Key Function:** `calculateBudget(trip, userBudget)`
+**Returns:**
+```json
+{
+  "transport": 400,
+  "stay": 500,
+  "activities": 120,
+  "meals": 250,
+  "total": 1270,
+  "averagePerDay": 254,
+  "overBudget": false,
+  "budgetRemaining": 230
+}
+```
 
-## Functions
+**Key Function:** `getDailyBudget(trip, dailyLimit)`
+**Returns:**
+```json
+[
+  { "date": "2026-09-15", "total": 174, "overBudget": false },
+  { "date": "2026-09-16", "total": 174, "overBudget": false }
+]
+```
 
-### `search/citySearch.js`
-- `searchCities(query)`: Search by name or country.
-- `filterCitiesByCountry(country)`: Exact match country.
-- `filterCitiesByRegion(region)`: Exact match region.
-- `filterCitiesByCost(maxCost)`: Filter by maximum cost index.
-- `sortCitiesByPopularity()`: Returns list sorted highest to lowest popularity.
+### 2. Timeline Generator (`timeline/timelineGenerator.js`)
+Generates a structured, chronological timeline spanning multiple cities.
 
-### `search/activitySearch.js`
-- `searchActivities(query)`: Search by name or description.
-- `filterActivitiesByCategory(category)`: Exact match category.
-- `filterActivitiesByCost(maxCost)`: Filter by maximum dollar cost.
-- `filterActivitiesByDuration(maxDuration)`: Filter by maximum hours.
+**Key Function:** `generateTimeline(trip)`
+**Returns:**
+```json
+[
+  {
+    "day": "Day 1",
+    "date": "2026-09-15",
+    "city": "Paris",
+    "activities": [
+      { "name": "Eiffel Tower Tour", "time": "TBD", "duration": 2.5, "cost": 30 }
+    ],
+    "totalDayCost": 180
+  }
+]
+```
 
-### `recommendations/recommendations.js`
-- `getRecommendedCities()`: Returns top 5 global cities based on popularity.
-- `getRecommendedActivities(cityId)`: Returns a curated list of activities for a specific city.
+### 3. Trip Summary (`summary/tripSummary.js`)
+Generates high-level statistics for the dashboard or itinerary view.
+
+**Key Function:** `generateTripSummary(trip)`
+**Returns:**
+```json
+{
+  "totalTripDays": 7,
+  "numberOfCities": 2,
+  "numberOfActivities": 4,
+  "totalEstimatedCost": 1500,
+  "averageDailyCost": 214.28,
+  "mostExpensiveDay": { "day": "Day 2", "date": "2026-09-16", "cost": 350 },
+  "mostExpensiveCity": { "city": "Paris", "cost": 900 }
+}
+```
+
+### ⚠️ Sample Trip Object (Input Format required by these modules)
+Your `trip` object passed from the frontend/backend should look like this:
+```json
+{
+  "id": "t1",
+  "name": "Euro Trip",
+  "startDate": "2026-09-15",
+  "stops": [
+    {
+      "city": "Paris",
+      "durationDays": 3,
+      "activities": [
+        { "name": "Eiffel Tower Tour", "estimatedCost": 30, "duration": 2 }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+## Hour 1: Data & Recommendations
+*   `data/cities.json`, `data/activities.json`
+*   `search/citySearch.js`, `search/activitySearch.js`
+*   `recommendations/recommendations.js`

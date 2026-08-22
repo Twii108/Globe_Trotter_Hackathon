@@ -59,8 +59,11 @@ function runMigrationsAsync() {
       addColumnIfMissing('users', 'avatar', 'TEXT'),
       addColumnIfMissing('users', 'preferred_currency', "TEXT DEFAULT 'USD'"),
       addColumnIfMissing('trips', 'budget', 'REAL DEFAULT 0'),
-      addColumnIfMissing('trips', 'share_id', 'TEXT UNIQUE'),
-      addColumnIfMissing('trips', 'is_public', 'INTEGER DEFAULT 0')
+      addColumnIfMissing('trips', 'share_id', 'TEXT'),
+      addColumnIfMissing('trips', 'is_public', 'INTEGER DEFAULT 0'),
+      addColumnIfMissing('trips', 'updated_at', 'DATETIME'),
+      addColumnIfMissing('expenses', 'expense_date', 'TEXT'),
+      addColumnIfMissing('trip_activities', 'position', 'INTEGER DEFAULT 0')
     ]).then(resolve);
   });
 }

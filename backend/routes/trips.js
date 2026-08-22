@@ -12,7 +12,8 @@ const {
 
 const {
   createStop,
-  getTripStops
+  getTripStops,
+  reorderStops
 } = require('../controllers/stopController');
 
 const {
@@ -47,6 +48,7 @@ router.delete('/:id', deleteTrip);
 // Nested Trip Stops
 router.post('/:id/stops', createStop);
 router.get('/:id/stops', getTripStops);
+router.put('/:id/stops/reorder', reorderStops);
 
 // Nested Trip Activities
 router.post('/:id/activities', addTripActivity);

@@ -1,345 +1,342 @@
-// Mock API service for GlobeTrotter Frontend
-// Components interact ONLY through this service layer.
+// GlobeTrotter Real API Service Layer
+// Connects directly to Express + SQLite backend (http://localhost:5000/api)
 
-const MOCK_USER = {
-  id: 'usr_101',
-  name: 'Alex Morgan',
-  email: 'alex.morgan@example.com',
-  avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80',
-  preferredCurrency: 'USD'
-};
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
-const INITIAL_TRIPS = [
-  {
-    id: 'trip_1',
-    name: 'Japan Autumn Discovery',
-    destination: 'Kyoto & Tokyo, Japan',
-    country: 'Japan',
-    startDate: '2026-09-15',
-    endDate: '2026-09-28',
-    description: 'Immerse in ancient shrines in Kyoto and neon cityscape in Tokyo during the autumn foliage season.',
-    durationDays: 14,
-    status: 'Upcoming',
-    budget: 3500,
-    spent: 1200,
-    coverImage: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=800&q=80',
-    tags: ['Culture', 'Food', 'Temples'],
-    stops: [
-      {
-        id: 'stop_1',
-        city: 'Kyoto',
-        startDate: '2026-09-15',
-        endDate: '2026-09-20',
-        activities: [
-          { id: 'act_1', name: 'Fushimi Inari Torii Gate Walk', time: '08:30 AM', cost: 0, dayNumber: 1, date: '2026-09-15' },
-          { id: 'act_2', name: 'Gion Traditional Tea Ceremony', time: '02:00 PM', cost: 60, dayNumber: 1, date: '2026-09-15' },
-          { id: 'act_3', name: 'Arashiyama Bamboo Forest Exploration', time: '09:30 AM', cost: 15, dayNumber: 2, date: '2026-09-16' },
-          { id: 'act_4', name: 'Kinkaku-ji (Golden Pavilion) Visit', time: '01:30 PM', cost: 10, dayNumber: 3, date: '2026-09-17' }
-        ]
-      },
-      {
-        id: 'stop_2',
-        city: 'Tokyo',
-        startDate: '2026-09-21',
-        endDate: '2026-09-28',
-        activities: [
-          { id: 'act_5', name: 'Shibuya Crossing & Observation Deck', time: '10:00 AM', cost: 25, dayNumber: 7, date: '2026-09-21' },
-          { id: 'act_6', name: 'Tsukiji Outer Market Food Tour', time: '08:30 AM', cost: 75, dayNumber: 8, date: '2026-09-22' },
-          { id: 'act_7', name: 'Akihabara Tech & Anime Stroll', time: '03:00 PM', cost: 40, dayNumber: 9, date: '2026-09-23' }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'trip_2',
-    name: 'Amalfi Coastal Dream',
-    destination: 'Amalfi Coast, Italy',
-    country: 'Italy',
-    startDate: '2026-11-04',
-    endDate: '2026-11-12',
-    description: 'Dramatic cliffs, lemon groves, and romantic cliffside villages in Positano and Ravello.',
-    durationDays: 8,
-    status: 'Planning',
-    budget: 2800,
-    spent: 650,
-    coverImage: 'https://images.unsplash.com/photo-1533105079780-92b9be482077?auto=format&fit=crop&w=800&q=80',
-    tags: ['Coastal', 'Scenic', 'Wine'],
-    stops: [
-      {
-        id: 'stop_3',
-        city: 'Positano',
-        startDate: '2026-11-04',
-        endDate: '2026-11-08',
-        activities: [
-          { id: 'act_8', name: 'Path of the Gods Scenic Hike', time: '09:00 AM', cost: 0, dayNumber: 1, date: '2026-11-04' },
-          { id: 'act_9', name: 'Sunset Mediterranean Boat Cruise', time: '05:00 PM', cost: 120, dayNumber: 2, date: '2026-11-05' }
-        ]
-      },
-      {
-        id: 'stop_4',
-        city: 'Ravello',
-        startDate: '2026-11-09',
-        endDate: '2026-11-12',
-        activities: [
-          { id: 'act_10', name: 'Villa Cimbrone Infinity Terrace Walk', time: '11:00 AM', cost: 12, dayNumber: 6, date: '2026-11-09' }
-        ]
-      }
-    ]
-  }
-];
+const TOKEN_KEY = 'globetrotter_token';
 
-const RECOMMENDED_DESTINATIONS = [
-  {
-    id: 'rec_1',
-    title: 'Santorini Sunset Experience',
-    location: 'Greece',
-    rating: 4.9,
-    reviewsCount: 328,
-    estimatedCost: 1800,
-    image: 'https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?auto=format&fit=crop&w=800&q=80',
-    category: 'Romantic'
-  },
-  {
-    id: 'rec_2',
-    title: 'Swiss Alps Hiking Adventure',
-    location: 'Switzerland',
-    rating: 4.8,
-    reviewsCount: 215,
-    estimatedCost: 2400,
-    image: 'https://images.unsplash.com/photo-1530122037265-a5f1f91d3b99?auto=format&fit=crop&w=800&q=80',
-    category: 'Adventure'
-  },
-  {
-    id: 'rec_3',
-    title: 'Bali Island Hopping',
-    location: 'Indonesia',
-    rating: 4.7,
-    reviewsCount: 450,
-    estimatedCost: 1200,
-    image: 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=800&q=80',
-    category: 'Tropical'
-  },
-  {
-    id: 'rec_4',
-    title: 'Reykjavik Northern Lights',
-    location: 'Iceland',
-    rating: 4.9,
-    reviewsCount: 189,
-    estimatedCost: 2100,
-    image: 'https://images.unsplash.com/photo-1504893524553-b855bce32c67?auto=format&fit=crop&w=800&q=80',
-    category: 'Nature'
-  }
-];
+// Helper to retrieve JWT token from localStorage
+export const getToken = () => localStorage.getItem(TOKEN_KEY);
+export const setToken = (token) => localStorage.setItem(TOKEN_KEY, token);
+export const removeToken = () => localStorage.removeItem(TOKEN_KEY);
 
-let currentTripsList = [...INITIAL_TRIPS];
-let currentUserSession = MOCK_USER;
+// Centralized HTTP Request Handler
+async function apiRequest(endpoint, options = {}) {
+  const { method = 'GET', body = null, requiresAuth = true, headers = {} } = options;
 
-// Utility delay function for realistic mock API responses
-const delay = (ms = 300) => new Promise(resolve => setTimeout(resolve, ms));
-
-// Helper: Calculate duration in days between two date strings
-const calculateDuration = (start, end) => {
-  if (!start || !end) return 7;
-  const d1 = new Date(start);
-  const d2 = new Date(end);
-  const diffTime = Math.abs(d2 - d1);
-  return Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1);
-};
-
-// MANDATORY API PLACEHOLDER FUNCTIONS FOR MEMBER 1 / MEMBER 2 API CONTRACT:
-
-export const getTrips = async () => {
-  await delay(300);
-  return [...currentTripsList];
-};
-
-export const getTrip = async (id) => {
-  await delay(250);
-  const trip = currentTripsList.find(t => String(t.id) === String(id));
-  if (!trip) {
-    throw new Error(`Trip with ID ${id} not found.`);
-  }
-  return { ...trip };
-};
-
-export const createTrip = async (tripData) => {
-  await delay(400);
-  const duration = calculateDuration(tripData.startDate, tripData.endDate);
-  const newTrip = {
-    id: `trip_${Date.now()}`,
-    name: tripData.name || tripData.destination || 'New Adventure',
-    destination: tripData.destination || tripData.name || 'Global Destination',
-    country: tripData.country || 'International',
-    startDate: tripData.startDate || new Date().toISOString().split('T')[0],
-    endDate: tripData.endDate || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
-    description: tripData.description || 'Custom planned trip itinerary on GlobeTrotter.',
-    durationDays: duration,
-    status: tripData.status || 'Planning',
-    budget: Number(tripData.budget) || 2000,
-    spent: Number(tripData.spent) || 0,
-    coverImage: tripData.coverImage || 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=800&q=80',
-    tags: tripData.tags || ['Vacation', 'Adventure'],
-    stops: tripData.stops || [
-      {
-        id: `stop_${Date.now()}_1`,
-        city: tripData.destination ? tripData.destination.split(',')[0] : 'Main Destination',
-        startDate: tripData.startDate || new Date().toISOString().split('T')[0],
-        endDate: tripData.endDate || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
-        activities: []
-      }
-    ]
-  };
-  currentTripsList.unshift(newTrip);
-  return newTrip;
-};
-
-export const updateTrip = async (id, tripData) => {
-  await delay(350);
-  const index = currentTripsList.findIndex(t => String(t.id) === String(id));
-  if (index === -1) {
-    throw new Error(`Trip with ID ${id} not found.`);
-  }
-
-  const updatedTrip = {
-    ...currentTripsList[index],
-    ...tripData,
-    durationDays: calculateDuration(
-      tripData.startDate || currentTripsList[index].startDate,
-      tripData.endDate || currentTripsList[index].endDate
-    )
-  };
-  currentTripsList[index] = updatedTrip;
-  return { ...updatedTrip };
-};
-
-export const deleteTrip = async (id) => {
-  await delay(300);
-  currentTripsList = currentTripsList.filter(t => String(t.id) !== String(id));
-  return true;
-};
-
-export const addStop = async (tripId, stopData) => {
-  await delay(300);
-  const trip = currentTripsList.find(t => String(t.id) === String(tripId));
-  if (!trip) {
-    throw new Error(`Trip with ID ${tripId} not found.`);
-  }
-  if (!trip.stops) trip.stops = [];
-
-  const newStop = {
-    id: `stop_${Date.now()}`,
-    city: stopData.city || 'New City Stop',
-    startDate: stopData.startDate || trip.startDate,
-    endDate: stopData.endDate || trip.endDate,
-    activities: stopData.activities || []
+  const reqHeaders = {
+    'Content-Type': 'application/json',
+    ...headers
   };
 
-  trip.stops.push(newStop);
-  return { trip, stop: newStop };
-};
-
-export const addActivity = async (tripId, stopId, activityData) => {
-  await delay(300);
-  const trip = currentTripsList.find(t => String(t.id) === String(tripId));
-  if (!trip) {
-    throw new Error(`Trip with ID ${tripId} not found.`);
+  if (requiresAuth) {
+    const token = getToken();
+    if (token) {
+      reqHeaders['Authorization'] = `Bearer ${token}`;
+    }
   }
 
-  const stop = trip.stops?.find(s => String(s.id) === String(stopId));
-  if (!stop) {
-    throw new Error(`Stop with ID ${stopId} not found in trip.`);
-  }
-  if (!stop.activities) stop.activities = [];
-
-  const newActivity = {
-    id: `act_${Date.now()}`,
-    name: activityData.name || 'New Activity',
-    time: activityData.time || '10:00 AM',
-    cost: Number(activityData.cost) || 0,
-    dayNumber: Number(activityData.dayNumber) || 1,
-    date: activityData.date || stop.startDate
+  const fetchOptions = {
+    method,
+    headers: reqHeaders
   };
 
-  stop.activities.push(newActivity);
-  return { trip, activity: newActivity };
+  if (body) {
+    fetchOptions.body = JSON.stringify(body);
+  }
+
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, fetchOptions);
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const errorMessage = data?.message || data?.error || `HTTP error ${response.status}`;
+    const err = new Error(errorMessage);
+    err.status = response.status;
+    err.data = data;
+    throw err;
+  }
+
+  return data;
+}
+
+// --- REUSABLE NORMALIZATION LAYER ---
+
+export const normalizeUser = (user) => {
+  if (!user) return null;
+  return {
+    id: String(user.id),
+    name: user.name || '',
+    email: user.email || '',
+    avatar: user.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80',
+    preferredCurrency: user.preferred_currency || user.preferredCurrency || 'USD',
+    createdAt: user.created_at || user.createdAt
+  };
 };
 
-export const removeActivity = async (tripId, stopId, activityId) => {
-  await delay(250);
-  const trip = currentTripsList.find(t => String(t.id) === String(tripId));
-  if (!trip) return null;
-  const stop = trip.stops?.find(s => String(s.id) === String(stopId));
+export const normalizeActivity = (act) => {
+  if (!act) return null;
+  return {
+    id: String(act.id),
+    cityId: act.city_id || act.cityId ? String(act.city_id || act.cityId) : null,
+    name: act.custom_name || act.name || act.activity_name || 'Activity',
+    category: act.category || 'Sightseeing',
+    description: act.description || '',
+    duration: Number(act.duration) || 1,
+    cost: Number(act.cost) || 0,
+    time: act.scheduled_time || act.time || '10:00 AM',
+    date: act.scheduled_date || act.date || '',
+    dayNumber: Number(act.dayNumber) || 1,
+    location: act.location || ''
+  };
+};
+
+export const normalizeStop = (stop) => {
   if (!stop) return null;
-
-  stop.activities = stop.activities.filter(a => String(a.id) !== String(activityId));
-  return { ...trip };
+  return {
+    id: String(stop.id),
+    tripId: String(stop.trip_id || stop.tripId),
+    cityId: stop.city_id || stop.cityId ? String(stop.city_id || stop.cityId) : null,
+    city: stop.city || stop.city_name || 'City Stop',
+    startDate: stop.start_date || stop.startDate || '',
+    endDate: stop.end_date || stop.endDate || '',
+    position: Number(stop.position) || 0,
+    activities: Array.isArray(stop.activities) ? stop.activities.map(normalizeActivity) : []
+  };
 };
 
-export const deleteStop = async (tripId, stopId) => {
-  await delay(250);
-  const trip = currentTripsList.find(t => String(t.id) === String(tripId));
+export const normalizeTrip = (trip) => {
   if (!trip) return null;
-  trip.stops = trip.stops.filter(s => String(s.id) !== String(stopId));
-  return { ...trip };
+  const startDate = trip.start_date || trip.startDate || new Date().toISOString().split('T')[0];
+  const endDate = trip.end_date || trip.endDate || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
+
+  let durationDays = 1;
+  if (startDate && endDate) {
+    const d1 = new Date(startDate);
+    const d2 = new Date(endDate);
+    if (!isNaN(d1.getTime()) && !isNaN(d2.getTime())) {
+      durationDays = Math.max(1, Math.ceil(Math.abs(d2 - d1) / (1000 * 60 * 60 * 24)) + 1);
+    }
+  }
+
+  return {
+    id: String(trip.id),
+    userId: String(trip.user_id || trip.userId || ''),
+    name: trip.name || trip.title || trip.destination || 'New Adventure',
+    destination: trip.destination || trip.name || 'Global Destination',
+    country: trip.country || 'International',
+    startDate,
+    endDate,
+    durationDays: Number(trip.durationDays) || durationDays,
+    status: trip.status || (new Date(startDate) > new Date() ? 'Upcoming' : 'Planning'),
+    description: trip.description || '',
+    budget: Number(trip.budget) || 0,
+    spent: Number(trip.spent) || 0,
+    coverImage: trip.cover_image || trip.coverImage || 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&w=800&q=80',
+    isPublic: Boolean(trip.is_public || trip.isPublic),
+    shareId: trip.share_id || trip.shareId || null,
+    createdAt: trip.created_at || trip.createdAt,
+    tags: Array.isArray(trip.tags) ? trip.tags : (trip.tags ? String(trip.tags).split(',') : ['Vacation']),
+    stops: Array.isArray(trip.stops) ? trip.stops.map(normalizeStop) : [],
+    activities: Array.isArray(trip.activities) ? trip.activities.map(normalizeActivity) : []
+  };
 };
 
-export const reorderStops = async (tripId, updatedStops) => {
-  await delay(250);
-  const trip = currentTripsList.find(t => String(t.id) === String(tripId));
-  if (!trip) return null;
-  trip.stops = updatedStops;
-  return { ...trip };
+export const normalizeCity = (city) => {
+  if (!city) return null;
+  return {
+    id: String(city.id),
+    name: city.name || '',
+    country: city.country || '',
+    region: city.region || '',
+    costIndex: Number(city.cost_index || city.costIndex) || 5,
+    popularity: Number(city.popularity) || 80,
+    description: city.description || ''
+  };
 };
 
-// Auth & Trip services bundle
+export const normalizeExpense = (expense) => {
+  if (!expense) return null;
+  return {
+    id: String(expense.id),
+    tripId: String(expense.trip_id || expense.tripId),
+    category: expense.category || 'other',
+    amount: Number(expense.amount) || 0,
+    description: expense.description || '',
+    expenseDate: expense.expense_date || expense.expenseDate || expense.created_at
+  };
+};
+
+// --- AUTHENTICATION SERVICE ---
+
 export const authService = {
   async login(email, password) {
-    await delay(400);
-    if (!email || !password) {
-      throw new Error('Email and password are required.');
+    const res = await apiRequest('/auth/login', {
+      method: 'POST',
+      body: { email, password },
+      requiresAuth: false
+    });
+
+    if (res?.data?.token) {
+      setToken(res.data.token);
     }
-    if (password.length < 6) {
-      throw new Error('Password must be at least 6 characters.');
-    }
-    currentUserSession = { ...MOCK_USER, email };
-    return {
-      user: currentUserSession,
-      token: 'mock_jwt_token_globetrotter_12345'
-    };
+    const user = normalizeUser(res?.data?.user);
+    return { user, token: res?.data?.token };
   },
 
   async signup({ name, email, password }) {
-    await delay(400);
-    if (!name || !email || !password) {
-      throw new Error('All fields are required.');
+    const res = await apiRequest('/auth/signup', {
+      method: 'POST',
+      body: { name, email, password },
+      requiresAuth: false
+    });
+
+    if (res?.data?.token) {
+      setToken(res.data.token);
     }
-    if (password.length < 6) {
-      throw new Error('Password must be at least 6 characters.');
-    }
-    currentUserSession = {
-      id: `usr_${Date.now()}`,
-      name,
-      email,
-      avatar: MOCK_USER.avatar,
-      preferredCurrency: 'USD'
-    };
-    return {
-      user: currentUserSession,
-      token: 'mock_jwt_token_globetrotter_67890'
-    };
+    const user = normalizeUser(res?.data?.user);
+    return { user, token: res?.data?.token };
   },
 
   async getCurrentUser() {
-    await delay(150);
-    return currentUserSession;
+    const token = getToken();
+    if (!token) return null;
+    try {
+      const res = await apiRequest('/auth/me', { method: 'GET', requiresAuth: true });
+      return normalizeUser(res?.data?.user);
+    } catch (err) {
+      removeToken();
+      return null;
+    }
   },
 
   async logout() {
-    await delay(150);
-    currentUserSession = null;
+    removeToken();
     return true;
   }
 };
+
+// --- TRIP SERVICE ---
+
+export const getTrips = async () => {
+  const res = await apiRequest('/trips', { method: 'GET' });
+  const rawTrips = res?.data || [];
+  return rawTrips.map(normalizeTrip);
+};
+
+export const getTrip = async (id) => {
+  const res = await apiRequest(`/trips/${id}`, { method: 'GET' });
+  return normalizeTrip(res?.data);
+};
+
+export const createTrip = async (tripData) => {
+  const payload = {
+    name: tripData.name || tripData.destination,
+    description: tripData.description || '',
+    start_date: tripData.startDate || tripData.start_date,
+    end_date: tripData.endDate || tripData.end_date,
+    budget: Number(tripData.budget) || 0,
+    cover_image: tripData.coverImage || tripData.cover_image
+  };
+
+  const res = await apiRequest('/trips', {
+    method: 'POST',
+    body: payload
+  });
+  return normalizeTrip(res?.data);
+};
+
+export const updateTrip = async (id, tripData) => {
+  const payload = {
+    name: tripData.name,
+    description: tripData.description,
+    start_date: tripData.startDate || tripData.start_date,
+    end_date: tripData.endDate || tripData.end_date,
+    budget: tripData.budget !== undefined ? Number(tripData.budget) : undefined,
+    cover_image: tripData.coverImage || tripData.cover_image
+  };
+
+  const res = await apiRequest(`/trips/${id}`, {
+    method: 'PUT',
+    body: payload
+  });
+  return normalizeTrip(res?.data);
+};
+
+export const deleteTrip = async (id) => {
+  await apiRequest(`/trips/${id}`, { method: 'DELETE' });
+  return true;
+};
+
+// --- STOP SERVICE ---
+
+export const addStop = async (tripId, stopData) => {
+  const payload = {
+    city_id: stopData.cityId || stopData.city_id || null,
+    city: stopData.city,
+    start_date: stopData.startDate || stopData.start_date,
+    end_date: stopData.endDate || stopData.end_date,
+    position: stopData.position
+  };
+
+  const res = await apiRequest(`/trips/${tripId}/stops`, {
+    method: 'POST',
+    body: payload
+  });
+
+  const updatedTrip = await getTrip(tripId);
+  return { trip: updatedTrip, stop: normalizeStop(res?.data) };
+};
+
+export const deleteStop = async (tripId, stopId) => {
+  await apiRequest(`/stops/${stopId}`, { method: 'DELETE' });
+  return await getTrip(tripId);
+};
+
+export const reorderStops = async (tripId, updatedStops) => {
+  const payload = {
+    stops: updatedStops.map((stop, idx) => ({
+      id: Number(stop.id),
+      position: idx
+    }))
+  };
+
+  await apiRequest(`/trips/${tripId}/stops/reorder`, {
+    method: 'PUT',
+    body: payload
+  });
+
+  return await getTrip(tripId);
+};
+
+// --- ACTIVITY SERVICE ---
+
+export const addActivity = async (tripId, stopId, activityData) => {
+  const payload = {
+    activity_id: activityData.activityId || activityData.activity_id || null,
+    stop_id: stopId ? Number(stopId) : null,
+    custom_name: activityData.name,
+    scheduled_date: activityData.date || activityData.scheduled_date,
+    scheduled_time: activityData.time || activityData.scheduled_time,
+    cost: Number(activityData.cost) || 0
+  };
+
+  const res = await apiRequest(`/trips/${tripId}/activities`, {
+    method: 'POST',
+    body: payload
+  });
+
+  const updatedTrip = await getTrip(tripId);
+  return { trip: updatedTrip, activity: normalizeActivity(res?.data) };
+};
+
+export const removeActivity = async (tripId, stopId, activityId) => {
+  await apiRequest(`/trips/${tripId}/activities/${activityId}`, { method: 'DELETE' });
+  return await getTrip(tripId);
+};
+
+// --- CITY & DISCOVERY SERVICE ---
+
+export const getCities = async () => {
+  const res = await apiRequest('/cities', { method: 'GET', requiresAuth: false });
+  return (res?.data || []).map(normalizeCity);
+};
+
+export const searchCities = async (query) => {
+  const res = await apiRequest(`/cities/search?q=${encodeURIComponent(query)}`, { method: 'GET', requiresAuth: false });
+  return (res?.data || []).map(normalizeCity);
+};
+
+// --- BUDGET, TIMELINE, EXPENSES & PROFILE ---
 
 export const tripService = {
   getUpcomingTrips: getTrips,
@@ -355,32 +352,37 @@ export const tripService = {
   reorderStops,
 
   async getRecommendedDestinations() {
-    await delay(250);
-    return [...RECOMMENDED_DESTINATIONS];
+    try {
+      const cities = await getCities();
+      return cities.slice(0, 4).map(c => ({
+        id: c.id,
+        title: c.name,
+        location: `${c.name}, ${c.country}`,
+        rating: 4.8,
+        reviewsCount: c.popularity * 3,
+        estimatedCost: c.costIndex * 250,
+        image: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=800&q=80',
+        category: c.region || 'Discovery'
+      }));
+    } catch (e) {
+      return [];
+    }
   },
 
   async getBudgetSummary() {
-    await delay(250);
-    const totalBudget = currentTripsList.reduce((acc, t) => acc + (t.budget || 0), 0);
-    const totalSpent = currentTripsList.reduce((acc, t) => acc + (t.spent || 0), 0);
-    return {
-      totalBudget: totalBudget || 0,
-      totalSpent: totalSpent || 0,
-      remaining: Math.max(0, totalBudget - totalSpent),
-      currency: '$'
-    };
-  },
-
-  async clearTrips() {
-    await delay(200);
-    currentTripsList = [];
-    return true;
-  },
-
-  async restoreDefaultTrips() {
-    await delay(200);
-    currentTripsList = [...INITIAL_TRIPS];
-    return [...currentTripsList];
+    try {
+      const trips = await getTrips();
+      const totalBudget = trips.reduce((acc, t) => acc + (t.budget || 0), 0);
+      const totalSpent = trips.reduce((acc, t) => acc + (t.spent || 0), 0);
+      return {
+        totalBudget,
+        totalSpent,
+        remaining: Math.max(0, totalBudget - totalSpent),
+        currency: '$'
+      };
+    } catch (e) {
+      return { totalBudget: 0, totalSpent: 0, remaining: 0, currency: '$' };
+    }
   }
 };
 
@@ -398,4 +400,3 @@ export default {
   deleteStop,
   reorderStops
 };
-

@@ -9,7 +9,6 @@ import {
   Compass, 
   Star, 
   TrendingUp, 
-  RefreshCw,
   FolderX
 } from 'lucide-react';
 import Navbar from '../components/Navbar';
@@ -80,38 +79,23 @@ export default function Dashboard({ user, onLogout }) {
         tags: newTripData.tags ? newTripData.tags.split(',').map(t => t.trim()) : ['Vacation']
       });
       setTrips((prev) => [created, ...prev]);
-      
-      // Update budget
+
       const updatedBudget = await tripService.getBudgetSummary();
       setBudget(updatedBudget);
 
-      // Reset modal and navigate to builder
       setNewTripData({ destination: '', country: '', startDate: '', endDate: '', budget: '', tags: '' });
       setIsModalOpen(false);
       navigate(`/trips/${created.id}/builder`);
     } catch (err) {
-      alert('Failed to create trip. Please try again.');
+      alert(err.message || 'Failed to create trip. Please try again.');
     } finally {
       setSubmittingTrip(false);
     }
   };
 
-  const handleClearTripsToggle = async () => {
-    if (trips.length > 0) {
-      await tripService.clearTrips();
-      setTrips([]);
-      setBudget({ totalBudget: 0, totalSpent: 0, remaining: 0, currency: '$' });
-    } else {
-      const restored = await tripService.restoreDefaultTrips();
-      setTrips(restored);
-      const updatedBudget = await tripService.getBudgetSummary();
-      setBudget(updatedBudget);
-    }
-  };
-
   return (
     <div className="dashboard-page">
-      <Navbar user={currentUser} onLogout={onLogout} />
+      <Navbar user={currentUser || user} onLogout={onLogout} />
 
       <main className="dashboard-content">
         <div className="container">
@@ -135,15 +119,6 @@ export default function Dashboard({ user, onLogout }) {
                   onClick={() => navigate('/trips/create')}
                 >
                   Plan New Trip
-                </Button>
-                <Button
-                  variant="outline"
-                  size="md"
-                  icon={<RefreshCw size={16} />}
-                  onClick={handleClearTripsToggle}
-                  style={{ color: '#fff', borderColor: 'rgba(255,255,255,0.4)', backgroundColor: 'rgba(255,255,255,0.1)' }}
-                >
-                  {trips.length > 0 ? 'Simulate Empty State' : 'Restore Demo Trips'}
                 </Button>
               </div>
             </div>

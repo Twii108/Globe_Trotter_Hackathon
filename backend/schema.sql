@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS trips (
   share_id TEXT UNIQUE,
   is_public INTEGER DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
@@ -72,6 +73,7 @@ CREATE TABLE IF NOT EXISTS trip_activities (
   scheduled_time TEXT,
   cost REAL DEFAULT 0,
   status TEXT DEFAULT 'planned',
+  position INTEGER DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (trip_id) REFERENCES trips(id) ON DELETE CASCADE,
   FOREIGN KEY (stop_id) REFERENCES stops(id) ON DELETE CASCADE,
@@ -84,6 +86,40 @@ CREATE TABLE IF NOT EXISTS expenses (
   category TEXT NOT NULL,
   amount REAL NOT NULL,
   description TEXT,
+  expense_date TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (trip_id) REFERENCES trips(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS transport_segments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  trip_id INTEGER NOT NULL,
+  mode TEXT NOT NULL,
+  departure_location TEXT,
+  arrival_location TEXT,
+  departure_time TEXT,
+  arrival_time TEXT,
+  cost REAL DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (trip_id) REFERENCES trips(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS saved_destinations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  city_id INTEGER NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (city_id) REFERENCES cities(id) ON DELETE CASCADE
+);
+
+-- Performance Indexes
+CREATE INDEX IF NOT EXISTS idx_trips_user_id ON trips(user_id);
+CREATE INDEX IF NOT EXISTS idx_stops_trip_id ON stops(trip_id);
+CREATE INDEX IF NOT EXISTS idx_stops_city_id ON stops(city_id);
+CREATE INDEX IF NOT EXISTS idx_activities_city_id ON activities(city_id);
+CREATE INDEX IF NOT EXISTS idx_trip_activities_trip_id ON trip_activities(trip_id);
+CREATE INDEX IF NOT EXISTS idx_trip_activities_stop_id ON trip_activities(stop_id);
+CREATE INDEX IF NOT EXISTS idx_expenses_trip_id ON expenses(trip_id);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_trips_share_id ON trips(share_id);

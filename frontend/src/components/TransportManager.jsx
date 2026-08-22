@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { Plane, Train, Bus, Car, Navigation, Plus, Trash2, Clock, DollarSign } from 'lucide-react';
 import Button from './Button';
 import Input from './Input';
@@ -53,6 +54,7 @@ export default function TransportManager({ tripId, stops = [], onTransportChange
       const updated = [...segments, created];
       setSegments(updated);
       if (onTransportChange) onTransportChange(updated);
+      toast.success('Transport segment added successfully!');
       setIsAddOpen(false);
       setNewSegment({
         mode: 'Flight',
@@ -63,7 +65,7 @@ export default function TransportManager({ tripId, stops = [], onTransportChange
         cost: '120'
       });
     } catch (err) {
-      alert('Failed to add transport segment.');
+      toast.error('Failed to add transport segment.');
     } finally {
       setSubmitting(false);
     }

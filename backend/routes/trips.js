@@ -7,6 +7,7 @@ const {
   getUserTrips,
   getTripById,
   updateTrip,
+  duplicateTrip,
   deleteTrip
 } = require('../controllers/tripController');
 
@@ -55,6 +56,7 @@ router.post('/', createTrip);
 router.get('/', getUserTrips);
 router.get('/:id', getTripById);
 router.put('/:id', updateTrip);
+router.post('/:id/duplicate', duplicateTrip);
 router.delete('/:id', deleteTrip);
 
 // Nested Trip Stops

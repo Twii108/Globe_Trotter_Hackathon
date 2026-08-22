@@ -523,16 +523,21 @@ export const deleteTrip = async (id) => {
 };
 
 export const duplicateTrip = async (id) => {
-  const original = await getTrip(id);
-  const copy = await createTrip({
-    name: `Copy of ${original.name}`,
-    description: original.description,
-    startDate: original.startDate,
-    endDate: original.endDate,
-    budget: original.budget,
-    coverImage: original.coverImage
-  });
-  return copy;
+  try {
+    const res = await apiRequest(`/trips/${id}/duplicate`, { method: 'POST' });
+    return normalizeTrip(res?.data);
+  } catch (err) {
+    const original = await getTrip(id);
+    const copy = await createTrip({
+      name: `Copy of ${original.name}`,
+      description: original.description,
+      startDate: original.startDate,
+      endDate: original.endDate,
+      budget: original.budget,
+      coverImage: original.coverImage
+    });
+    return copy;
+  }
 };
 
 // STOPS

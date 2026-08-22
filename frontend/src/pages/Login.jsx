@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { Mail, Lock, Compass, ArrowRight } from 'lucide-react';
 import Input from '../components/Input';
 import Button from '../components/Button';
@@ -69,7 +70,7 @@ export default function Login({ onLoginSuccess }) {
   const handleForgotSubmit = (e) => {
     e.preventDefault();
     if (!forgotEmail || !/\S+@\S+\.\S+/.test(forgotEmail)) {
-      alert('Please enter a valid email address.');
+      toast.error('Please enter a valid email address.');
       return;
     }
     setForgotSuccess(true);

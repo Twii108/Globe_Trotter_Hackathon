@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, GitCommit, Clock, MapPin, Calendar, DollarSign, Compass } from 'lucide-react';
 import Navbar from '../components/Navbar';
+import TripSubNav from '../components/TripSubNav';
 import Button from '../components/Button';
 import { getTrip } from '../services/api';
 import '../styles/dashboard.css';
@@ -89,6 +90,7 @@ export default function TimelineScreen({ user, onLogout }) {
   return (
     <div className="dashboard-page">
       <Navbar user={user} onLogout={onLogout} />
+      <TripSubNav tripId={id} activeTab="timeline" />
 
       <main className="dashboard-content" style={{ padding: '2rem 0 4rem 0' }}>
         <div className="container" style={{ maxWidth: '960px' }}>

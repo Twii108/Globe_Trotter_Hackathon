@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar';
 import Button from '../components/Button';
 import Input from '../components/Input';
@@ -72,10 +73,10 @@ export default function ProfileSettings() {
         preferredCurrency: user.preferredCurrency,
         travelStyle: user.travelStyle
       });
-      setSuccessMessage('Profile and preferences updated successfully!');
-      setTimeout(() => setSuccessMessage(''), 3000);
+
+      toast.success('Profile and preferences updated successfully!');
     } catch (err) {
-      alert(err.message || 'Failed to update profile.');
+      toast.error(err.message || 'Failed to update profile.');
     } finally {
       setSaving(false);
     }
@@ -84,6 +85,7 @@ export default function ProfileSettings() {
   const handleUnsaveCity = async (cityId) => {
     await toggleSaveCity(cityId);
     setSavedCities(savedCities.filter(c => String(c.id) !== String(cityId)));
+    toast.success('Removed from saved destinations.');
   };
 
   const handleOpenAddModal = (city) => {
@@ -99,10 +101,10 @@ export default function ProfileSettings() {
         city: selectedCity.name,
         cityId: selectedCity.id
       });
-      alert(`Added ${selectedCity.name} to trip!`);
+      toast.success(`Added ${selectedCity.name} to trip!`);
       setIsAddModalOpen(false);
     } catch (err) {
-      alert('Failed to add stop.');
+      toast.error('Failed to add stop.');
     }
   };
 

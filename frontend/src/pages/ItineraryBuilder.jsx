@@ -25,7 +25,7 @@ import {
   MapPin, Plus, Trash2, Calendar, Clock, DollarSign, ArrowUp, ArrowDown,
   AlertTriangle, ShieldCheck, Share2, Check, Copy, ExternalLink, Activity as ActivityIcon, Compass, Eye
 } from 'lucide-react';
-import '../styles/dashboard.css';
+import TripSubNav from '../components/TripSubNav';
 
 export default function ItineraryBuilder() {
   const { id } = useParams();
@@ -257,6 +257,7 @@ export default function ItineraryBuilder() {
   return (
     <div className="dashboard-layout">
       <Navbar activeTab="my-trips" />
+      <TripSubNav tripId={id} activeTab="builder" />
 
       <main className="dashboard-content" style={{ maxWidth: '1100px', margin: '0 auto' }}>
         {/* Header Action Bar */}

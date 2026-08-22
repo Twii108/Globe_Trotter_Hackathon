@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import Button from '../components/Button';
 import {
   Compass, MapPin, Calendar, Clock, DollarSign, Share2, Copy, Check,
@@ -45,12 +46,13 @@ export default function PublicShareScreen() {
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href);
     setCopied(true);
+    toast.success('Share link copied to clipboard!');
     setTimeout(() => setCopied(false), 2500);
   };
 
   const handleCopyTripToAccount = async () => {
     if (!currentUser) {
-      alert('Please log in to your GlobeTrotter account to copy this trip.');
+      toast.error('Please log in to your GlobeTrotter account to copy this trip.');
       navigate('/login');
       return;
     }
@@ -58,10 +60,10 @@ export default function PublicShareScreen() {
     setCopying(true);
     try {
       const newTrip = await copySharedTrip(shareId);
-      alert(`Trip "${newTrip.name}" duplicated to your profile!`);
+      toast.success(`Trip "${newTrip.name}" duplicated to your profile!`);
       navigate(`/trips/${newTrip.id}`);
     } catch (err) {
-      alert(err.message || 'Failed to copy trip.');
+      toast.error(err.message || 'Failed to copy trip.');
     } finally {
       setCopying(false);
     }

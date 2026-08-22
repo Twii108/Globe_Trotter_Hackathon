@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar';
+import TripSubNav from '../components/TripSubNav';
 import Button from '../components/Button';
 import Input from '../components/Input';
 import Modal from '../components/Modal';
@@ -65,7 +67,7 @@ export default function BudgetScreen() {
   const handleAddExpenseSubmit = async (e) => {
     e.preventDefault();
     if (!expenseForm.amount || Number(expenseForm.amount) <= 0) {
-      alert('Please enter a valid expense amount.');
+      toast.error('Please enter a valid expense amount.');
       return;
     }
 
@@ -79,6 +81,7 @@ export default function BudgetScreen() {
       });
 
       setExpenses([newExp, ...expenses]);
+      toast.success('Expense logged successfully!');
       setIsAddExpenseOpen(false);
       setExpenseForm({
         category: 'Miscellaneous',
@@ -87,7 +90,7 @@ export default function BudgetScreen() {
         expenseDate: new Date().toISOString().split('T')[0]
       });
     } catch (err) {
-      alert('Failed to log expense.');
+      toast.error('Failed to log expense.');
     } finally {
       setSubmitting(false);
     }
@@ -110,6 +113,7 @@ export default function BudgetScreen() {
   return (
     <div className="dashboard-layout">
       <Navbar activeTab="my-trips" />
+      <TripSubNav tripId={id} activeTab="budget" />
 
       <main className="dashboard-content" style={{ maxWidth: '1050px', margin: '0 auto' }}>
         {/* Header Navigation */}

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
+import Home from './pages/Home';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
@@ -7,6 +9,9 @@ import CreateTrip from './pages/CreateTrip';
 import MyTrips from './pages/MyTrips';
 import ItineraryBuilder from './pages/ItineraryBuilder';
 import ItineraryView from './pages/ItineraryView';
+import TripMapScreen from './pages/TripMapScreen';
+import TripHealthScreen from './pages/TripHealthScreen';
+import TransportScreen from './pages/TransportScreen';
 import CitySearch from './pages/CitySearch';
 import ActivitySearch from './pages/ActivitySearch';
 import BudgetScreen from './pages/BudgetScreen';
@@ -79,162 +84,195 @@ export default function App() {
   }
 
   return (
-    <Routes>
-      {/* Root redirect */}
-      <Route
-        path="/"
-        element={<Navigate to={currentUser ? "/dashboard" : "/login"} replace />}
-      />
+    <>
+      <Toaster position="top-right" toastOptions={{ duration: 4000, style: { fontSize: '0.9rem', borderRadius: '8px' } }} />
+      <Routes>
+        {/* Public Landing Page */}
+        <Route
+          path="/"
+          element={<Home user={currentUser} onLogout={handleLogout} />}
+        />
 
-      {/* Auth Routes */}
-      <Route
-        path="/login"
-        element={
-          currentUser ? <Navigate to="/dashboard" replace /> : <Login onLoginSuccess={handleLoginSuccess} />
-        }
-      />
-      <Route
-        path="/signup"
-        element={
-          currentUser ? <Navigate to="/dashboard" replace /> : <Signup onSignupSuccess={handleSignupSuccess} />
-        }
-      />
+        {/* Auth Routes */}
+        <Route
+          path="/login"
+          element={
+            currentUser ? <Navigate to="/dashboard" replace /> : <Login onLoginSuccess={handleLoginSuccess} />
+          }
+        />
+        <Route
+          path="/signup"
+          element={
+            currentUser ? <Navigate to="/dashboard" replace /> : <Signup onSignupSuccess={handleSignupSuccess} />
+          }
+        />
 
-      {/* Main Pages */}
-      <Route
-        path="/dashboard"
-        element={
-          currentUser ? (
-            <Dashboard user={currentUser} onLogout={handleLogout} />
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
-      />
-      <Route
-        path="/trips"
-        element={
-          currentUser ? (
-            <MyTrips user={currentUser} onLogout={handleLogout} />
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
-      />
-      <Route
-        path="/trips/create"
-        element={
-          currentUser ? (
-            <CreateTrip user={currentUser} onLogout={handleLogout} />
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
-      />
-      <Route
-        path="/cities"
-        element={
-          currentUser ? (
-            <CitySearch user={currentUser} onLogout={handleLogout} />
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
-      />
-      <Route
-        path="/activities"
-        element={
-          currentUser ? (
-            <ActivitySearch user={currentUser} onLogout={handleLogout} />
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
-      />
-      <Route
-        path="/profile"
-        element={
-          currentUser ? (
-            <ProfileSettings user={currentUser} onLogout={handleLogout} />
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
-      />
+        {/* Main Application Pages */}
+        <Route
+          path="/dashboard"
+          element={
+            currentUser ? (
+              <Dashboard user={currentUser} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/trips"
+          element={
+            currentUser ? (
+              <MyTrips user={currentUser} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/trips/create"
+          element={
+            currentUser ? (
+              <CreateTrip user={currentUser} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/cities"
+          element={
+            currentUser ? (
+              <CitySearch user={currentUser} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/activities"
+          element={
+            currentUser ? (
+              <ActivitySearch user={currentUser} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            currentUser ? (
+              <ProfileSettings user={currentUser} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
 
-      {/* Trip Specific Sub-Screens */}
-      <Route
-        path="/trips/:id/builder"
-        element={
-          currentUser ? (
-            <ItineraryBuilder user={currentUser} onLogout={handleLogout} />
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
-      />
-      <Route
-        path="/trips/:id/view"
-        element={
-          currentUser ? (
-            <ItineraryView user={currentUser} onLogout={handleLogout} />
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
-      />
-      <Route
-        path="/trips/:id"
-        element={
-          currentUser ? (
-            <ItineraryBuilder user={currentUser} onLogout={handleLogout} />
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
-      />
-      <Route
-        path="/trips/:id/budget"
-        element={
-          currentUser ? (
-            <BudgetScreen user={currentUser} onLogout={handleLogout} />
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
-      />
-      <Route
-        path="/trips/:id/timeline"
-        element={
-          currentUser ? (
-            <TimelineScreen user={currentUser} onLogout={handleLogout} />
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
-      />
-      <Route
-        path="/trips/:id/share"
-        element={
-          currentUser ? (
-            <PublicShareScreen user={currentUser} onLogout={handleLogout} />
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        }
-      />
+        {/* Trip Specific Sub-Screens */}
+        <Route
+          path="/trips/:id/builder"
+          element={
+            currentUser ? (
+              <ItineraryBuilder user={currentUser} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/trips/:id/view"
+          element={
+            currentUser ? (
+              <ItineraryView user={currentUser} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/trips/:id"
+          element={
+            currentUser ? (
+              <ItineraryBuilder user={currentUser} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/trips/:id/timeline"
+          element={
+            currentUser ? (
+              <TimelineScreen user={currentUser} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/trips/:id/map"
+          element={
+            currentUser ? (
+              <TripMapScreen user={currentUser} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/trips/:id/budget"
+          element={
+            currentUser ? (
+              <BudgetScreen user={currentUser} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/trips/:id/transport"
+          element={
+            currentUser ? (
+              <TransportScreen user={currentUser} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/trips/:id/health"
+          element={
+            currentUser ? (
+              <TripHealthScreen user={currentUser} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/trips/:id/share"
+          element={
+            currentUser ? (
+              <PublicShareScreen user={currentUser} onLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
 
-      {/* Public Unauthenticated Share Route */}
-      <Route
-        path="/shared/:shareId"
-        element={<PublicShareScreen />}
-      />
+        {/* Public Unauthenticated Share Route */}
+        <Route
+          path="/shared/:shareId"
+          element={<PublicShareScreen />}
+        />
 
-      {/* Fallback Catch-all */}
-      <Route
-        path="*"
-        element={<Navigate to="/" replace />}
-      />
-    </Routes>
+        {/* Fallback Catch-all Route */}
+        <Route
+          path="*"
+          element={<Navigate to="/" replace />}
+        />
+      </Routes>
+    </>
   );
 }

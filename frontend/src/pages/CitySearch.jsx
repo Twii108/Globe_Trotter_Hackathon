@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar';
 import Button from '../components/Button';
 import Input from '../components/Input';
@@ -62,7 +63,7 @@ export default function CitySearch() {
   const handleAddStopSubmit = async (e) => {
     e.preventDefault();
     if (!selectedTripId) {
-      alert('Please select a trip.');
+      toast.error('Please select a trip.');
       return;
     }
     setSubmitting(true);
@@ -73,10 +74,10 @@ export default function CitySearch() {
         startDate: startDate,
         endDate: endDate
       });
-      alert(`Added ${selectedCity.name} to trip!`);
+      toast.success(`Added ${selectedCity.name} to trip!`);
       setIsAddModalOpen(false);
     } catch (err) {
-      alert(err.message || 'Failed to add stop.');
+      toast.error(err.message || 'Failed to add stop.');
     } finally {
       setSubmitting(false);
     }

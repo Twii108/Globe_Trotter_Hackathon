@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar';
 import Button from '../components/Button';
 import Input from '../components/Input';
@@ -65,7 +66,7 @@ export default function ActivitySearch() {
   const handleAddSubmit = async (e) => {
     e.preventDefault();
     if (!selectedTripId || !selectedStopId) {
-      alert('Please select a trip and destination stop.');
+      toast.error('Please select a trip and destination stop.');
       return;
     }
     setSubmitting(true);
@@ -78,10 +79,10 @@ export default function ActivitySearch() {
         time: scheduledTime,
         cost: selectedActivity.cost
       });
-      alert(`Added "${selectedActivity.name}" to trip itinerary!`);
+      toast.success(`Added "${selectedActivity.name}" to trip itinerary!`);
       setIsAddModalOpen(false);
     } catch (err) {
-      alert(err.message || 'Failed to add activity.');
+      toast.error(err.message || 'Failed to add activity.');
     } finally {
       setSubmitting(false);
     }

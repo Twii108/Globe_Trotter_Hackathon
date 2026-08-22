@@ -7,7 +7,8 @@
     "start": "node server/index.js",
     "seed": "node server/seed/seedCitiesActivities.js",
     "seed:cities": "node server/seed/seedCitiesActivities.js",
-    "test": "node server/test/cities.test.js"
+    "test": "node server/test/cities.test.js",
+    "test:trips": "node test_trips.js"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

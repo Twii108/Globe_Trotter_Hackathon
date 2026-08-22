@@ -5,12 +5,23 @@ let pool = null;
 let usePg = true;
 let sqliteDb = null;
 
-const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/globetrotter';
-
-pool = new Pool({
-  connectionString,
-  connectionTimeoutMillis: 2000
-});
+try {
+  pool = require('./config/db');
+  if (pool && typeof pool.query === 'function') {
+    usePg = true;
+  }
+} catch (e) {
+  const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/globetrotter';
+  try {
+    pool = new Pool({
+      connectionString,
+      connectionTimeoutMillis: 2000,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    });
+  } catch (err) {
+    usePg = false;
+  }
+}
 
 function getSqliteDb() {
   if (!sqliteDb) {
@@ -28,6 +39,7 @@ function querySqlite(text, params = []) {
     let sqliteSql = text
       .replace(/SERIAL PRIMARY KEY/gi, 'INTEGER PRIMARY KEY AUTOINCREMENT')
       .replace(/TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP/gi, 'DATETIME DEFAULT CURRENT_TIMESTAMP')
+      .replace(/NOW\(\)/gi, 'CURRENT_TIMESTAMP')
       .replace(/TRUNCATE TABLE (\w+) RESTART IDENTITY CASCADE;/gi, 'DELETE FROM $1; DELETE FROM sqlite_sequence WHERE name=\'$1\';')
       .replace(/ILIKE/gi, 'LIKE')
       .replace(/RETURNING \*/gi, '')
@@ -35,7 +47,6 @@ function querySqlite(text, params = []) {
       .replace(/RETURNING id, name, email/gi, '')
       .replace(/RETURNING id/gi, '');
 
-    let paramIdx = 1;
     sqliteSql = sqliteSql.replace(/\$\d+/g, () => '?');
 
     const isSelect = /^\s*SELECT/i.test(sqliteSql);
@@ -61,8 +72,11 @@ function querySqlite(text, params = []) {
   });
 }
 
+const inMemoryTrips = [];
+let nextTripId = 1;
+
 const query = async (text, params) => {
-  if (usePg) {
+  if (usePg && pool) {
     try {
       return await pool.query(text, params);
     } catch (err) {
@@ -83,5 +97,9 @@ const query = async (text, params) => {
 
 module.exports = {
   query,
-  pool
+  pool,
+  inMemoryTrips,
+  getNextTripId: () => nextTripId++,
+  isPgUsed: () => usePg && pool !== null
 };
+

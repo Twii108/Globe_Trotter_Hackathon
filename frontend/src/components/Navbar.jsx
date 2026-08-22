@@ -20,12 +20,11 @@ export default function Navbar({ user: propUser, onLogout }) {
   }, [propUser]);
 
   const handleLogout = async () => {
+    await authService.logout();
     if (onLogout) {
       onLogout();
-    } else {
-      await authService.logout();
-      navigate('/login');
     }
+    navigate('/');
   };
 
   const isActive = (path) => location.pathname === path;
